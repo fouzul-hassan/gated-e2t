@@ -84,7 +84,7 @@ You can either
 ## BibTeX
 
   ```bibtex
-  @article{liu2022glim,
+  @article{liu2025glim,
     title={Learning Interpretable Representations Leads to Semantically Faithful EEG-to-Text Generation},
     author={Xiaozhao Liu and Dinggang Shen and Xihui Liu},
     year={2025},
