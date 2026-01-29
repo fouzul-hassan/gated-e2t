@@ -5,8 +5,8 @@ echo "🔹 Updating pip"
 python3 -m pip install --upgrade pip
 
 echo "🔹 Cloning GLIM repo"
-git clone https://github.com/fouzul-hassan/GLIM.git
-cd GLIM
+git clone https://github.com/fouzul-hassan/energy-gated-glim.git
+cd energy-gated-glim
 
 echo "🔹 Installing requirements"
 pip install -r requirements.txt
