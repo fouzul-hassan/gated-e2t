@@ -36,7 +36,15 @@ def parse_args():
     # Configuration (must match training)
     parser.add_argument('--use_gated', action='store_true', help='Use if model trained with gated attention')
     parser.add_argument('--use_energy', action='store_true', help='Use if model trained with energy components')
-    parser.add_argument('--generation_strategy', type=str, default='beam', help='Generation strategy for eval')
+    parser.add_argument('--generation_strategy', type=str, default='beam',
+                        choices=['beam', 'nucleus', 'greedy', 'energy'],
+                        help='Generation strategy for eval')
+    # Decoding knobs (optional overrides; useful for sweeps)
+    parser.add_argument('--num_beams', type=int, default=None, help='Beam width (only for beam)')
+    parser.add_argument('--top_p', type=float, default=None, help='Nucleus sampling top_p (only for nucleus)')
+    parser.add_argument('--temperature', type=float, default=None, help='Sampling temperature (only for nucleus)')
+    parser.add_argument('--energy_rerank_candidates', type=int, default=None,
+                        help='Num candidates for energy reranking (only for energy decoding)')
     
     parser.add_argument('--gpus', type=str, default='0', help='GPU IDs')
     parser.add_argument('--bsz_test', type=int, default=24, help='Batch size')
@@ -84,6 +92,11 @@ def main():
         generation_strategy=args.generation_strategy,
         use_etes_eval=args.use_energy, # Ensure ETES is on if energy is requested
         use_energy_loss=False,         # No loss calculation needed for eval
+        # Optional decoding overrides
+        **({} if args.num_beams is None else {"num_beams": args.num_beams}),
+        **({} if args.top_p is None else {"top_p": args.top_p}),
+        **({} if args.temperature is None else {"temperature": args.temperature}),
+        **({} if args.energy_rerank_candidates is None else {"energy_rerank_candidates": args.energy_rerank_candidates}),
     )
     
     # Trainer

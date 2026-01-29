@@ -688,6 +688,7 @@ class GLIM(L.LightningModule):
         all_rows = []  # list[dict] -> dataframe
         all_group_metrics = {}
         to_mean_metrics = []
+        to_mean_retrieval_metrics = []
         for group_key, intermediates_list_dict in sorted(group_dict.items()):
             t_key, d_key, s_key, raw_t_key = group_key.split('-')
             intermediates = default_collate(intermediates_list_dict)
@@ -723,6 +724,8 @@ class GLIM(L.LightningModule):
             try:
                 retrieval_metrics = self.cal_retrieval_metrics(logits, strict=True)
                 group_metrics.update(retrieval_metrics)
+                # collect for dataset-level mean retrieval metrics
+                to_mean_retrieval_metrics.append(retrieval_metrics)
             except AssertionError:  # NOTE ignore this group if bsz < self.bsz_retrieval, controled by `strict`
                 pass
 
@@ -766,6 +769,11 @@ class GLIM(L.LightningModule):
                 })
         to_mean_metrics = default_collate(to_mean_metrics)
         mean_metrics.update({f"{prefix}/mean_{k}":v.mean() for k,v in to_mean_metrics.items()})
+
+        # Mean retrieval metrics across groups where it was computed
+        if len(to_mean_retrieval_metrics) > 0:
+            to_mean_retrieval_metrics = default_collate(to_mean_retrieval_metrics)
+            mean_metrics.update({f"{prefix}/mean_{k}": v.mean() for k, v in to_mean_retrieval_metrics.items()})
         
         # ETES evaluation (if enabled)
         if self.use_etes_eval and self.etes_evaluator is not None:
