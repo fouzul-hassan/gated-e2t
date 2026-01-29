@@ -1,0 +1,27 @@
+GLIM DATA & CHECKPOINT SUMMARY
+Generated: 2026-01-23 19:48:28.879688
+======================================================================
+
+📦 CHECKPOINT:
+   glim-zuco-epoch=199-step=49600.ckpt (216 MB)
+   - Fully trained GLIM model (200 epochs)
+   - Reusable: eeg_encoder, aligner, p_embedder
+   - Replace: text_model (T5-Large → smaller model)
+
+📊 DATA FILES:
+   zuco_eeg_label_8variants.df (10.7 GB)
+   - Main training data: EEG + text + 8 paraphrases
+   - ~16,000 samples (80% train, 10% val, 10% test)
+   - EEG shape: (128 channels, 1280 samples)
+
+   zuco_label_8variants.df (1.7 MB)
+   - Text labels + 8 paraphrase variants
+
+   glim_gen_results.pkl (2.3 MB)
+   - GLIM generation outputs for evaluation
+
+🎯 FOR GLIM-LITE:
+   1. Load pretrained eeg_encoder, aligner from checkpoint
+   2. Use zuco_eeg_label_8variants.df for training
+   3. Replace T5-Large with BART-Small (5x smaller)
+   4. Freeze EEG encoder, fine-tune decoder only

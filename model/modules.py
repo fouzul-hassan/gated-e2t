@@ -3,7 +3,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.vision_transformer import Mlp
-from typing import Literal
+from typing import Literal, Optional
 
 
 class PromptEmbedder(nn.Module):
@@ -267,17 +267,24 @@ class Aligner(nn.Module):
 class EncoderBlock(nn.Module):
     """
     A Transformer encoder block with adaptive layernorm (adaLN) from DiT.
+    Supports optional gated attention for improved feature learning.
     """
     def __init__(self, hidden_dim, hidden_len, 
                  inject_prompt=True, temporal_modulate=True, is_causal=False, 
-                 num_heads=8, mlp_ratio=4, dropout=0.0):
+                 num_heads=8, mlp_ratio=4, dropout=0.0,
+                 use_gated_attention=False, gating_type='elementwise'):
         super().__init__()
         self.inject_prompt = inject_prompt
         self.temporal_modulate = temporal_modulate
         self.is_causal = is_causal
+        self.use_gated_attention = use_gated_attention
         self.norm1 = nn.LayerNorm(hidden_dim, eps=1e-6, elementwise_affine = not inject_prompt)
-        # self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
-        self.attn = SelfAttention(hidden_dim, num_heads, dropout, is_causal=is_causal)
+        # Choose between standard attention and gated attention
+        if use_gated_attention:
+            self.attn = GatedSelfAttention(hidden_dim, num_heads, dropout, is_causal=is_causal,
+                                           gating_type=gating_type)
+        else:
+            self.attn = SelfAttention(hidden_dim, num_heads, dropout, is_causal=is_causal)
         self.norm2 = nn.LayerNorm(hidden_dim, eps=1e-6, elementwise_affine = not inject_prompt)
         self.mlp = Mlp(hidden_dim, hidden_dim * mlp_ratio, drop=dropout,
                        act_layer=lambda: nn.GELU(approximate="tanh"))
@@ -318,15 +325,26 @@ class EncoderBlock(nn.Module):
 
 class DecoderBlock(nn.Module):
     """
-    A naive Transformer decoder block.
+    A Transformer decoder block with self-attention + cross-attention.
+    Supports optional gated attention for improved cross-modal learning.
     """
-    def __init__(self, dim, num_heads=8, mlp_ratio=4, dropout=0.0, is_causal=True):
+    def __init__(self, dim, num_heads=8, mlp_ratio=4, dropout=0.0, is_causal=True,
+                 use_gated_attention=False, gating_type='elementwise'):
         super().__init__()
+        self.use_gated_attention = use_gated_attention
         self.norm1 = nn.LayerNorm(dim, eps=1e-6, elementwise_affine=True)
-        # self.attn = Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
-        self.self_attn = SelfAttention(dim, num_heads, dropout, is_causal=is_causal)
+        # Choose between standard and gated self-attention
+        if use_gated_attention:
+            self.self_attn = GatedSelfAttention(dim, num_heads, dropout, is_causal=is_causal,
+                                                gating_type=gating_type)
+        else:
+            self.self_attn = SelfAttention(dim, num_heads, dropout, is_causal=is_causal)
         self.norm2 = nn.LayerNorm(dim, eps=1e-6, elementwise_affine=True)
-        self.cross_attn = CrossAttention(dim, num_heads, dropout)
+        # Choose between standard and gated cross-attention
+        if use_gated_attention:
+            self.cross_attn = GatedCrossAttention(dim, num_heads, dropout, gating_type=gating_type)
+        else:
+            self.cross_attn = CrossAttention(dim, num_heads, dropout)
         self.norm3 = nn.LayerNorm(dim, eps=1e-6, elementwise_affine=True)
         self.mlp = Mlp(dim, dim * mlp_ratio, drop=dropout,
                        act_layer=lambda: nn.GELU(approximate="tanh"))
@@ -403,3 +421,174 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
+
+
+############################################# Gated Attention Modules #############################################
+# Based on "Gated Attention for Large Language Models" (NeurIPS 2025 Best Paper)
+# Paper: https://arxiv.org/abs/2505.06708
+# Key insight: Adding sigmoid gates after SDPA introduces non-linearity and enables query-dependent sparsity
+
+
+class GatedSelfAttention(nn.Module):
+    """
+    Self-Attention with Elementwise Gating.
+    
+    Applies a query-dependent sigmoid gate after the standard SDPA output.
+    This introduces non-linearity and enables the model to adaptively suppress
+    irrelevant attention outputs, which is particularly useful for noisy EEG signals.
+    
+    From the Gated Attention paper:
+    - Introduces non-linearity upon the low-rank mapping in softmax attention
+    - Applies query-dependent sparse gating scores to modulate SDPA output
+    - Mitigates 'attention sink' phenomenon and enhances training stability
+    """
+    def __init__(self, 
+                 hidden_dim: int, 
+                 num_heads: int, 
+                 dropout: float = 0, 
+                 bias: bool = True,  
+                 batch_first: bool = True,
+                 is_causal: bool = False,
+                 gating_type: Literal['elementwise', 'headwise'] = 'elementwise'):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+        self.is_causal = is_causal
+        self.gating_type = gating_type
+        
+        # Standard multi-head attention
+        self.mha = nn.MultiheadAttention(hidden_dim, num_heads, dropout, bias, batch_first=batch_first)
+        
+        # Gating mechanism: query-dependent gates
+        if gating_type == 'elementwise':
+            # Elementwise: each element of the attention output gets its own gate
+            self.gate_proj = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        else:  # headwise
+            # Headwise: each attention head gets a single scalar gate
+            self.gate_proj = nn.Linear(hidden_dim, num_heads, bias=True)
+        
+        # Initialize gates to be close to 1 for stable training start
+        nn.init.zeros_(self.gate_proj.weight)
+        nn.init.ones_(self.gate_proj.bias)  # Sigmoid(1) ≈ 0.73, allows gradual learning
+        
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None, need_weights: bool = False):
+        """
+        Args:
+            x: Input tensor of shape (B, L, D)
+            mask: Optional attention mask of shape (B, L), 1 for unmasked, 0 for masked
+            need_weights: Whether to return attention weights
+            
+        Returns:
+            Gated attention output of shape (B, L, D)
+        """
+        B, L, D = x.shape
+        
+        # Handle causal masking
+        attn_mask = None
+        key_padding_mask = None
+        
+        if self.is_causal and mask is None:
+            attn_mask = torch.triu(
+                torch.full((L, L), float('-inf'), dtype=x.dtype, device=x.device),
+                diagonal=1).unsqueeze(0)
+            attn_mask = attn_mask.expand(B * self.num_heads, -1, -1)
+        elif mask is not None:
+            key_padding_mask = ~mask.bool()
+        
+        # Standard attention
+        if attn_mask is not None:
+            attn_output, attn_weights = self.mha(x, x, x, attn_mask=attn_mask, 
+                                                  is_causal=self.is_causal, need_weights=need_weights)
+        else:
+            attn_output, attn_weights = self.mha(x, x, x, key_padding_mask=key_padding_mask, 
+                                                  need_weights=need_weights)
+        
+        # Compute query-dependent gates from input (not from output)
+        gate = torch.sigmoid(self.gate_proj(x))  # (B, L, D) or (B, L, num_heads)
+        
+        # Apply gating
+        if self.gating_type == 'elementwise':
+            # Elementwise gating: gate has shape (B, L, D)
+            gated_output = attn_output * gate
+        else:
+            # Headwise gating: reshape attention output to apply per-head gates
+            attn_output = attn_output.view(B, L, self.num_heads, self.head_dim)
+            gate = gate.unsqueeze(-1)  # (B, L, num_heads, 1)
+            gated_output = (attn_output * gate).view(B, L, D)
+        
+        return gated_output
+
+
+class GatedCrossAttention(nn.Module):
+    """
+    Cross-Attention with Elementwise Gating.
+    
+    Similar to GatedSelfAttention but for cross-attention scenarios where
+    queries and keys/values come from different sources (e.g., EEG queries
+    attending to text representations, or vice versa).
+    
+    The gate is computed from the query, making it query-dependent and allowing
+    the model to dynamically control how much cross-modal information to incorporate.
+    """
+    def __init__(self, 
+                 hidden_dim: int, 
+                 num_heads: int, 
+                 dropout: float = 0, 
+                 bias: bool = True,  
+                 batch_first: bool = True,
+                 gating_type: Literal['elementwise', 'headwise'] = 'elementwise'):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+        self.gating_type = gating_type
+        
+        # Standard multi-head attention for cross-attention
+        self.mha = nn.MultiheadAttention(hidden_dim, num_heads, dropout, bias, batch_first=batch_first)
+        
+        # Gating mechanism: query-dependent gates
+        if gating_type == 'elementwise':
+            self.gate_proj = nn.Linear(hidden_dim, hidden_dim, bias=True)
+        else:  # headwise
+            self.gate_proj = nn.Linear(hidden_dim, num_heads, bias=True)
+        
+        # Initialize gates to be close to 1 for stable training start
+        nn.init.zeros_(self.gate_proj.weight)
+        nn.init.ones_(self.gate_proj.bias)
+        
+    def forward(self, q: torch.Tensor, kv: torch.Tensor, mask: Optional[torch.Tensor] = None, 
+                need_weights: bool = False) -> tuple:
+        """
+        Args:
+            q: Query tensor of shape (B, Lq, D)
+            kv: Key-Value tensor of shape (B, Lkv, D)
+            mask: Optional key padding mask of shape (B, Lkv), 1 for unmasked, 0 for masked
+            need_weights: Whether to return attention weights
+            
+        Returns:
+            Tuple of (gated_output, attention_weights)
+            - gated_output: shape (B, Lq, D)
+            - attention_weights: shape (B, Lq, Lkv) or None
+        """
+        B, Lq, D = q.shape
+        
+        # Handle mask
+        key_padding_mask = ~mask.bool() if mask is not None else None
+        
+        # Standard cross-attention
+        attn_output, attn_weights = self.mha(q, kv, kv, key_padding_mask=key_padding_mask, 
+                                              need_weights=need_weights)
+        
+        # Compute query-dependent gates
+        gate = torch.sigmoid(self.gate_proj(q))  # (B, Lq, D) or (B, Lq, num_heads)
+        
+        # Apply gating
+        if self.gating_type == 'elementwise':
+            gated_output = attn_output * gate
+        else:
+            attn_output = attn_output.view(B, Lq, self.num_heads, self.head_dim)
+            gate = gate.unsqueeze(-1)  # (B, Lq, num_heads, 1)
+            gated_output = (attn_output * gate).view(B, Lq, D)
+        
+        return gated_output, attn_weights

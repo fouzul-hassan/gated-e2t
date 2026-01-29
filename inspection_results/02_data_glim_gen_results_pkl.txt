@@ -1,0 +1,8 @@
+Data File Inspection Report: glim_gen_results.pkl
+Generated: 2026-01-23 19:48:28.791784
+======================================================================
+
+File: ./data/tmp\glim_gen_results.pkl
+Size: 0.00 GB
+
+Error inspecting file: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False. If you are running on a CPU-only machine, please use torch.load with map_location=torch.device('cpu') to map your storages to the CPU.

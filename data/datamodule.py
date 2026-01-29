@@ -262,8 +262,7 @@ class ZuCoDataset(Dataset):
             targets_tuple_list = [(text, ) for text in data['target text']]
         else:
             data = self.__fetch_from_df(df, "input text")
-            if eval_noise_input:
-                data['eeg']
+            # Note: eval_noise_input handling is done later in the code
             target_lists = [df[key].values.tolist() for key in pt_target_keys]
             targets_tuple_list = list(zip(*target_lists))
         data.update({"all target texts": targets_tuple_list})

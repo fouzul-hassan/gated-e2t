@@ -1,0 +1,45 @@
+Data File Inspection Report: zuco_eeg_label_8variants.df
+Generated: 2026-01-23 19:47:46.202547
+======================================================================
+
+File: ./data/tmp\zuco_eeg_label_8variants.df
+Size: 10.72 GB
+
+Shape: (16316, 22)
+Columns: ['eeg', 'mask', 'subject', 'label id', 'raw text', 'dataset', 'task', 'control', 'raw label', 'input text', 'text uid', 'sentiment label', 'relation label', 'lexical simplification (v0)', 'lexical simplification (v1)', 'semantic clarity (v0)', 'semantic clarity (v1)', 'syntax simplification (v0)', 'syntax simplification (v1)', 'naive rewritten', 'naive simplified', 'phase']
+
+Column Details:
+-----------------------------------------------------------------
+  eeg: numpy array, shape=(1280, 128), dtype=float32
+  mask: numpy array, shape=(1280,), dtype=int8
+  subject: string, example='ZAB...'
+  label id: int64, example=0
+  raw text: string, example='Presents a good case while failing to provide a re...'
+  dataset: string, example='ZuCo1...'
+  task: string, example='task1...'
+  control: bool, example=False
+  raw label: string, example='0...'
+  input text: string, example='Presents a good case while failing to provide a re...'
+  text uid: int64, example=0
+  sentiment label: string, example='neutral...'
+  relation label: object, example=nan
+  lexical simplification (v0): string, example='Makes a good point, but doesn't give us a reason t...'
+  lexical simplification (v1): string, example='The movie makes a good point, but doesn't give us ...'
+  semantic clarity (v0): string, example='The movie makes some good points, but it does not ...'
+  semantic clarity (v1): string, example='The movie presents a good argument but fails to ev...'
+  syntax simplification (v0): string, example='The movie makes some good points, but it fails to ...'
+  syntax simplification (v1): string, example='The movie makes some good points, but fails to evo...'
+  naive rewritten: string, example='It presents a good case while failing to provide a...'
+  naive simplified: string, example='It's a good case, but it doesn't provide a reason ...'
+  phase: string, example='train...'
+
+Data Split:
+  train: 13023 samples (79.8%)
+  val: 1631 samples (10.0%)
+  test: 1662 samples (10.2%)
+
+EEG Statistics (first sample):
+  Shape: (1280, 128)
+  Range: [-26.8489, 42.0672]
+  Mean: 0.0062
+  Std: 2.3655

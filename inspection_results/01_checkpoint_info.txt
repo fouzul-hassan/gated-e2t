@@ -1,0 +1,71 @@
+GLIM Checkpoint Inspection Report
+Generated: 2026-01-23 19:47:45.872585
+======================================================================
+
+File: ./glim-trained-checkpoint/glim-zuco-epoch=199-step=49600.ckpt
+Size: 226.7 MB
+
+Top-level keys: ['epoch', 'global_step', 'pytorch-lightning_version', 'state_dict', 'loops', 'callbacks', 'optimizer_states', 'lr_schedulers', 'hparams_name', 'hyper_parameters']
+
+Epoch: 199
+Global Step: 49600
+
+
+Model Components (204 tensors):
+-----------------------------------------------------------------
+
+Component                    Tensors          Params    Size (MB)
+-----------------------------------------------------------------
+aligner                           12       8,662,016         34.6
+eeg_encoder                      188      10,305,536         41.2
+p_embedder                         4           4,739          0.0
+-----------------------------------------------------------------
+TOTAL                            204      18,972,291         75.9
+
+
+======================================================================
+DETAILED COMPONENT STRUCTURE
+======================================================================
+
+[aligner] - 8,662,016 params
+  aligner.q_x: [1, 1, 1024]
+  aligner.q_y: [1, 1, 1024]
+  aligner.in_proj.weight: [1024, 256]
+  aligner.in_proj.bias: [1024]
+  aligner.cross_attn_x.in_proj_weight: [3072, 1024]
+  aligner.cross_attn_x.in_proj_bias: [3072]
+  aligner.cross_attn_x.out_proj.weight: [1024, 1024]
+  aligner.cross_attn_x.out_proj.bias: [1024]
+  aligner.cross_attn_y.in_proj_weight: [3072, 1024]
+  aligner.cross_attn_y.in_proj_bias: [3072]
+  ... and 2 more
+
+[eeg_encoder] - 10,305,536 params
+  eeg_encoder.shared_queries: [1, 96, 256]
+  eeg_encoder.pos_embed: [1, 1280, 128]
+  eeg_encoder.in_blocks.0.attn.in_proj_weight: [384, 128]
+  eeg_encoder.in_blocks.0.attn.in_proj_bias: [384]
+  eeg_encoder.in_blocks.0.attn.out_proj.weight: [128, 128]
+  eeg_encoder.in_blocks.0.attn.out_proj.bias: [128]
+  eeg_encoder.in_blocks.0.mlp.fc1.weight: [512, 128]
+  eeg_encoder.in_blocks.0.mlp.fc1.bias: [512]
+  eeg_encoder.in_blocks.0.mlp.fc2.weight: [128, 512]
+  eeg_encoder.in_blocks.0.mlp.fc2.bias: [128]
+  ... and 178 more
+
+[p_embedder] - 4,739 params
+  p_embedder.sigma: [3]
+  p_embedder.embedders.0.weight: [3, 128]
+  p_embedder.embedders.1.weight: [3, 128]
+  p_embedder.embedders.2.weight: [31, 128]
+
+
+======================================================================
+REUSABLE COMPONENTS FOR GLIM-LITE
+======================================================================
+
+✅ eeg_encoder   - Pretrained EEG feature extraction (~5M params)
+✅ aligner       - EEG-to-Text alignment Q-Aligner (~2M params)
+✅ p_embedder    - Prompt embeddings (~0.5M params)
+
+❌ text_model    - T5-Large decoder (770M params) - TOO BIG, REPLACE

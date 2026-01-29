@@ -16,6 +16,7 @@ from transformers import AutoTokenizer, T5ForConditionalGeneration, BartForCondi
 from transformers.modeling_outputs import BaseModelOutput
 
 from .modules import PromptEmbedder, EEGEncoder, Aligner
+from .energy import EnergyContrastiveLoss, EnergyGuidedGenerator, ETESEvaluator
 
 
 
@@ -44,6 +45,22 @@ class GLIM(L.LightningModule):
                  num_heads = 8,
                  mlp_ratio = 4,
                  dropout = 0.0,
+                 # Gated Attention Configuration (from NeurIPS 2025 Best Paper)
+                 use_gated_attention: bool = False,
+                 gating_type: Literal['elementwise', 'headwise'] = 'elementwise',
+                 # Generation Configuration (Nucleus Sampling from Holtzman et al.)
+                 generation_strategy: Literal['beam', 'nucleus', 'greedy', 'energy'] = 'beam',
+                 num_beams: int = 2,
+                 top_p: float = 0.95,  # Nucleus sampling threshold
+                 top_k: int = 0,       # 0 = disabled (use pure nucleus)
+                 temperature: float = 0.7,  # Sampling temperature
+                 # Energy-Based Configuration (Novel)
+                 use_energy_loss: bool = False,  # Add EBM contrastive loss
+                 energy_loss_weight: float = 0.3,  # Weight for energy loss
+                 energy_type: Literal['cosine', 'bilinear', 'mlp'] = 'cosine',
+                 use_etes_eval: bool = False,  # Enable ETES evaluation metric
+                 energy_rerank_candidates: int = 5,  # Candidates for energy reranking
+                 # Loss weights
                  clip_loss_weight = 0.5,
                  commitment_loss_weight = 0.0,
                  commitment_loss_key: Literal['mse','kl_div']= 'mse',
@@ -62,6 +79,23 @@ class GLIM(L.LightningModule):
         self.tgt_text_len = tgt_text_len
         self.prompt_tuning_len = prompt_tuning_len
         self.eval_pembed = evaluate_prompt_embed
+
+        # Generation configuration
+        self.generation_strategy = generation_strategy
+        self.num_beams = num_beams
+        self.top_p = top_p
+        self.top_k = top_k
+        self.temperature = temperature
+
+        # Energy-based configuration
+        self.use_energy_loss = use_energy_loss
+        self.energy_loss_weight = energy_loss_weight
+        self.use_etes_eval = use_etes_eval
+        self.energy_rerank_candidates = energy_rerank_candidates
+        
+        # Initialize energy loss if enabled (actual module created in setup())
+        self._energy_type = energy_type
+        self._embed_dim = embed_dim  # Store for energy loss initialization
 
         self.λ = clip_loss_weight
         self.ε = commitment_loss_weight
@@ -96,7 +130,9 @@ class GLIM(L.LightningModule):
         self.eeg_encoder = EEGEncoder(input_eeg_len, hidden_eeg_len, input_dim, hidden_dim, 
                                       prompt_tuning_len, n_in_blocks, n_out_blocks, 
                                       in_temporal_modulate, out_is_causal, 
-                                      num_heads=num_heads, mlp_ratio=mlp_ratio, dropout=dropout)
+                                      num_heads=num_heads, mlp_ratio=mlp_ratio, dropout=dropout,
+                                      use_gated_attention=use_gated_attention, 
+                                      gating_type=gating_type)
         
         self.aligner = Aligner(hidden_dim, embed_dim, num_heads, dropout, commitment_loss_key, use_y_mask) 
         self.use_y_mask = use_y_mask
@@ -113,6 +149,40 @@ class GLIM(L.LightningModule):
             torch_dtype = torch.bfloat16, # FIXME
             ).requires_grad_(False)
         assert self.embed_dim == self.text_model.config.d_model
+
+        # Initialize energy-based components if enabled
+        if self.use_energy_loss:
+            self.energy_loss = EnergyContrastiveLoss(
+                temperature=0.07,
+                energy_type=self._energy_type,
+                hidden_dim=self._embed_dim,
+                learn_temperature=True
+            )
+        else:
+            self.energy_loss = None
+        
+        # Initialize energy-guided generator if using energy decoding
+        if self.generation_strategy == 'energy':
+            self.energy_generator = EnergyGuidedGenerator(
+                text_model=self.text_model,
+                tokenizer=self.tokenizer,
+                aligner=self.aligner,
+                n_candidates=self.energy_rerank_candidates,
+                mode='rerank'
+            )
+        else:
+            self.energy_generator = None
+        
+        # Initialize ETES evaluator if enabled
+        if self.use_etes_eval:
+            self.etes_evaluator = ETESEvaluator(
+                aligner=self.aligner,
+                text_encoder=self.text_model.get_encoder(),
+                tokenizer=self.tokenizer,
+                include_fluency=False
+            )
+        else:
+            self.etes_evaluator = None
 
     def add_prompt(self, on:Literal['task','dataset','subject'], prompt):
         # TODO: on x -> self.x_prompts += prompt
@@ -419,12 +489,63 @@ class GLIM(L.LightningModule):
         return ids
 
     def generation_step(self, shared_outputs) -> tuple[dict]:
-        # generation 
-        # NOTE: with batch=24, 4090D*1: num_beams=2 --> 3min15s, 4690MB; 
-        #                               num_beams=4 --> 3min30s, 6924MB; 
-        gen_ids = self.text_model.generate(encoder_outputs = BaseModelOutput(shared_outputs['eeg_embeds']), 
-                                           num_beams = 2, 
-                                           min_length = 0, max_length=self.tgt_text_len)
+        """
+        Generate text from EEG embeddings using configurable decoding strategy.
+        
+        Supports three strategies:
+        - 'beam': Beam search (original GLIM behavior)
+        - 'nucleus': Nucleus (top-p) sampling from Holtzman et al. 2019
+          "The Curious Case of Neural Text Degeneration" (arXiv:1904.09751)
+        - 'greedy': Greedy decoding (fastest, most deterministic)
+        
+        Nucleus Sampling dynamically selects the smallest set of tokens whose
+        cumulative probability exceeds top_p, then samples from this "nucleus".
+        This captures the uncertainty inherent in EEG-to-text decoding while
+        avoiding the repetitive/generic outputs often produced by beam search.
+        """
+        encoder_outputs = BaseModelOutput(shared_outputs['eeg_embeds'])
+        
+        if self.generation_strategy == 'nucleus':
+            # Nucleus (top-p) sampling: sample from the dynamic probability nucleus
+            # This produces more diverse and natural text compared to beam search
+            gen_ids = self.text_model.generate(
+                encoder_outputs=encoder_outputs,
+                do_sample=True,               # Enable sampling mode
+                top_p=self.top_p,             # Nucleus sampling threshold (default: 0.95)
+                top_k=self.top_k,             # Optional top-k filter (0 = disabled)
+                temperature=self.temperature, # Control diversity (lower = less random)
+                min_length=0,
+                max_length=self.tgt_text_len,
+                num_return_sequences=1,
+            )
+        elif self.generation_strategy == 'greedy':
+            # Greedy decoding: always pick the most likely token
+            gen_ids = self.text_model.generate(
+                encoder_outputs=encoder_outputs,
+                do_sample=False,
+                num_beams=1,
+                min_length=0,
+                max_length=self.tgt_text_len,
+            )
+        elif self.generation_strategy == 'energy' and self.energy_generator is not None:
+            # Energy-guided decoding: generate candidates and select by EEG alignment
+            # This uses the EnergyGuidedGenerator to rerank candidates
+            result = self.energy_generator.generate(
+                eeg_embeds=shared_outputs['eeg_embeds'],
+                eeg_emb_vector=shared_outputs.get('eeg_emb_vector', shared_outputs['eeg_embeds'].mean(dim=1)),
+                max_length=self.tgt_text_len,
+            )
+            gen_ids = result['ids']
+        else:  # beam search (default, original GLIM behavior)
+            # NOTE: with batch=24, 4090D*1: num_beams=2 --> 3min15s, 4690MB; 
+            #                               num_beams=4 --> 3min30s, 6924MB; 
+            gen_ids = self.text_model.generate(
+                encoder_outputs=encoder_outputs,
+                num_beams=self.num_beams,
+                min_length=0,
+                max_length=self.tgt_text_len,
+            )
+        
         out_ids_dict = {'gen_ids': self.pad_ids(gen_ids)}  # for gathering accross devices
         tf_ids = self.convert_logits_to_ids(shared_outputs['logits_lm'])
         out_ids_dict.update({'tf_ids': tf_ids})
@@ -653,10 +774,28 @@ class GLIM(L.LightningModule):
 
         gen_strs = [None]*len(eeg)
         if generate:
-            gen_ids = self.text_model.generate(encoder_outputs = BaseModelOutput(eeg_embs), 
-                                                num_beams = 2, 
-                                                min_length=0, max_length=self.tgt_text_len,
-                                                )
+            encoder_outputs = BaseModelOutput(eeg_embs)
+            if self.generation_strategy == 'nucleus':
+                gen_ids = self.text_model.generate(
+                    encoder_outputs=encoder_outputs,
+                    do_sample=True,
+                    top_p=self.top_p,
+                    top_k=self.top_k,
+                    temperature=self.temperature,
+                    min_length=0, max_length=self.tgt_text_len,
+                )
+            elif self.generation_strategy == 'greedy':
+                gen_ids = self.text_model.generate(
+                    encoder_outputs=encoder_outputs,
+                    do_sample=False, num_beams=1,
+                    min_length=0, max_length=self.tgt_text_len,
+                )
+            else:  # beam
+                gen_ids = self.text_model.generate(
+                    encoder_outputs=encoder_outputs,
+                    num_beams=self.num_beams,
+                    min_length=0, max_length=self.tgt_text_len,
+                )
             gen_strs = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
         return probs, gen_strs
     

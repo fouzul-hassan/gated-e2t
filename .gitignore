@@ -1,0 +1,13 @@
+data/raw-data/
+*.mat
+data/raw_data/ZuCo1/task_materials/*.csv
+data/raw_data/ZuCo1/revised_csv/*.csv
+data/raw_data/ZuCo2/task_materials/*.csv
+data/raw_data/ZuCo2/revised_csv/*.csv
+
+data/tmp/zuco_eeg_128ch_1280len.df
+data/tmp/zuco_eeg_label_8variants.df
+
+*.zip
+
+glim-trained-checkpoint/*.ckpt

@@ -1,0 +1,24 @@
+Data File Inspection Report: zuco_eeg_128ch_1280len.df
+Generated: 2026-01-23 19:47:56.883192
+======================================================================
+
+File: ./data/tmp\zuco_eeg_128ch_1280len.df
+Size: 10.72 GB
+
+Shape: (16316, 6)
+Columns: ['eeg', 'mask', 'text', 'dataset', 'task', 'subject']
+
+Column Details:
+-----------------------------------------------------------------
+  eeg: numpy array, shape=(1280, 128), dtype=float32
+  mask: numpy array, shape=(1280,), dtype=int8
+  text: string, example='Presents a good case while failing to provide a re...'
+  dataset: string, example='ZuCo1...'
+  task: string, example='task1...'
+  subject: string, example='ZAB...'
+
+EEG Statistics (first sample):
+  Shape: (1280, 128)
+  Range: [-26.8489, 42.0672]
+  Mean: 0.0062
+  Std: 2.3655
