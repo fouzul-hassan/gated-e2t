@@ -231,9 +231,9 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     
-    table.add_row("clip-like acc", f"{clip_acc.item():.4f}")
-    table.add_row("clip-like acc [raw input text]", f"{clip_acc_raw.item():.4f}")
-    table.add_row("clip-like acc [gen text]", f"{clip_acc_gen.item():.4f}")
+    table.add_row("EEG Accuracy", f"{clip_acc.item():.4f}")
+    table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item():.4f}")
+    table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item():.4f}")
     
     # LLM accuracy (optional)
     if use_llm and llm_pipe:
@@ -325,10 +325,10 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     
-    table.add_row("clip-like acc1", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
-    table.add_row("clip-like acc3", f"{clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3:.4f}")
-    table.add_row("clip-like acc [raw input text]", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
-    table.add_row("clip-like acc [gen text]", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
+    table.add_row("EEG Acc (Top-1)", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
+    table.add_row("EEG Acc (Top-3)", f"{clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3:.4f}")
+    table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
+    table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
     
     # LLM accuracy
     if use_llm and llm_pipe and all_labels:
@@ -428,9 +428,9 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     
-    table.add_row("clip-like acc", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
-    table.add_row("clip-like acc [raw input text]", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
-    table.add_row("clip-like acc [gen text]", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
+    table.add_row("EEG Accuracy", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
+    table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
+    table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
     
     # LLM accuracy
     if use_llm and llm_pipe and all_labels:
