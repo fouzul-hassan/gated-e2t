@@ -190,7 +190,7 @@ class GLIM(L.LightningModule):
         # maybe self.prompt_nums
         pass
 
-    def on_save_checkpoint(self, checkpoint: torch.Dict[str, torch.Any]) -> None:
+    def on_save_checkpoint(self, checkpoint: dict) -> None:
         for key in deepcopy(list(checkpoint['state_dict'].keys())):
             if 'text_model' in key: 
                 checkpoint['state_dict'].pop(key)
@@ -345,12 +345,32 @@ class GLIM(L.LightningModule):
         loss_clip = shared_outputs['loss_clip']                 # (1)
         loss_lm = shared_outputs['loss_lm']                     # (1)
         loss = self.λ * loss_clip + (1-self.λ) * loss_lm + self.ε * loss_commitment
+        
+        # Energy-based loss (if enabled)
+        if self.use_energy_loss and self.energy_loss is not None:
+            energy_result = self.energy_loss(
+                shared_outputs['eeg_emb_vector'],
+                shared_outputs['text_emb_vector'],
+                return_metrics=True
+            )
+            loss_energy = energy_result['loss']
+            loss = loss + self.energy_loss_weight * loss_energy
+            energy_metrics = {
+                'loss_energy': loss_energy,
+                'energy_acc_e2t': energy_result.get('acc_eeg_to_text', 0.0),
+                'energy_acc_t2e': energy_result.get('acc_text_to_eeg', 0.0),
+                'energy_temperature': energy_result.get('temperature', 0.07),
+            }
+        else:
+            energy_metrics = {}
+        
         metrics = {'loss': loss,
                    'loss_commitment': loss_commitment,
                    'loss_clip': loss_clip,              
                    'loss_lm': loss_lm, 
                 #    'learning_rate': self.lr_schedulers().get_last_lr()[0],
                     } 
+        metrics.update(energy_metrics)
 
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)
         metrics.update(retrieval_metrics)
@@ -376,6 +396,17 @@ class GLIM(L.LightningModule):
                    'loss_clip': loss_clip,              
                    'loss_lm': loss_lm,         
                     } 
+        
+        # Energy-based metrics (if enabled)
+        if self.use_energy_loss and self.energy_loss is not None:
+            energy_result = self.energy_loss(
+                shared_outputs['eeg_emb_vector'],
+                shared_outputs['text_emb_vector'],
+                return_metrics=True
+            )
+            metrics['loss_energy'] = energy_result['loss']
+            metrics['energy_acc_e2t'] = energy_result.get('acc_eeg_to_text', 0.0)
+            metrics['energy_acc_t2e'] = energy_result.get('acc_text_to_eeg', 0.0)
 
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)  
         # NOTE: only for checkpointing here, allowing smaller batch size
@@ -720,6 +751,25 @@ class GLIM(L.LightningModule):
                 })
         to_mean_metrics = default_collate(to_mean_metrics)
         mean_metrics.update({f"{prefix}/mean_{k}":v.mean() for k,v in to_mean_metrics.items()})
+        
+        # ETES evaluation (if enabled)
+        if self.use_etes_eval and self.etes_evaluator is not None:
+            try:
+                etes_results = self.etes_evaluator.evaluate(
+                    eeg_emb_vectors=gathered_dict['eeg_emb_vector'],
+                    generated_texts=gen_strs,
+                    reference_texts=gen_tgt_strs,
+                )
+                etes_metrics = {
+                    f'{prefix}/etes_alignment': etes_results['etes_alignment'],
+                    f'{prefix}/etes_total': etes_results['etes_total'],
+                    f'{prefix}/etes_reference': etes_results.get('etes_reference', 0.0),
+                    f'{prefix}/etes_gap': etes_results.get('etes_gap', 0.0),
+                }
+                mean_metrics.update(etes_metrics)
+            except Exception as e:
+                print(f"[ETES] Evaluation failed: {e}")
+        
         if self.current_epoch == 0:
             self.define_metrics(list(all_group_metrics.keys())+list(mean_metrics.keys()))
         # all_group_metrics = {k: v.to(self.device) for k, v in all_group_metrics.items()}
