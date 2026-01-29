@@ -109,9 +109,8 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
             "role": "system", 
             "content": (
                 "You task is to classify the relation type in the following sentence."
-                " Labels: 0='place of birth', 1='place of death', 2='country of nationality',"
-                " 3='country of administrative divisions', 4='place of headquarters',"
-                " 5='neighborhood of', 6='company', 7='children', 8='employment history', 9='peer'."
+                " Labels: 0='awarding', 1='education', 2='employment', 3='foundation',"
+                " 4='job title', 5='nationality', 6='political affiliation', 7='visit', 8='marriage'."
                 " Please just output the integer label."
             )
         }
@@ -120,7 +119,7 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
             "role": "system", 
             "content": (
                 "You task is to classify the sentiment of the following sentence."
-                " Labels: 0='very negative', 1='negative', 2='neutral', 3='positive', 4='very positive'."
+                " Labels: 0='negative', 1='neutral', 2='positive'."
                 " Please just output the integer label."
             )
         }
@@ -260,18 +259,20 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     console.print("RELATION CLASSIFICATION", style="bold blue")
     console.print("="*80 + "\n", style="bold blue")
     
-    prefix = "The relation type is: "
+    prefix = "Relation classification: "
+    template = "It is about <MASK>."
+    # These are the actual relation labels from the ZuCo dataset (Task 3)
     relation_types = [
-        "place of birth", "place of death", "country of nationality",
-        "country of administrative divisions", "place of headquarters",
-        "neighborhood of", "company", "children", "employment history", "peer"
+        'awarding', 'education', 'employment', 'foundation', 
+        'job title', 'nationality', 'political affiliation', 'visit', 'marriage'
     ]
-    candidates = [prefix + r for r in relation_types]
+    candidates = [prefix + template.replace("<MASK>", label) for label in relation_types]
     label_to_idx = {r: i for i, r in enumerate(relation_types)}
     
     results = []
     all_labels = []
     all_probs = []
+    seen_labels = set()  # Debug: collect unique labels
     
     with torch.no_grad():
         for batch in track(dm.test_dataloader(), description="[EEG] Relation prediction"):
@@ -285,7 +286,8 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
             
             for i in range(len(eeg)):
                 rel_label = relation_labels[i] if i < len(relation_labels) else None
-                label_idx = label_to_idx.get(rel_label, -1) if rel_label else -1
+                seen_labels.add(rel_label)  # Debug
+                label_idx = label_to_idx.get(rel_label, -1) if rel_label and rel_label != 'nan' else -1
                 
                 if label_idx >= 0:
                     all_labels.append(label_idx)
@@ -300,6 +302,9 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
                     'pred': prob[i].argmax().item(),
                 })
     
+    # Debug: print unique labels seen in data
+    console.print(f"[dim]Unique relation labels in data: {seen_labels}[/dim]")
+    
     # EEG-based accuracy
     if all_probs:
         probs = torch.cat(all_probs, dim=0)
@@ -309,7 +314,7 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
-        probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device)
+        probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="To English: <MASK>.")
         clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor.cpu(), num_classes=len(relation_types), top_k=1, average='micro')
         clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor.cpu(), num_classes=len(relation_types), top_k=1, average='micro')
     else:
@@ -336,6 +341,14 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     console.print(table)
     console.print(f"Valid samples: {len(all_labels)}")
     
+    # Debug: show label distribution
+    if all_labels:
+        from collections import Counter
+        label_counts = Counter(all_labels)
+        console.print("Label distribution:")
+        for idx, count in sorted(label_counts.items()):
+            console.print(f"  {relation_types[idx]}: {count}")
+    
     return {
         'results': results,
         'clip_acc1': clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1,
@@ -353,14 +366,17 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     console.print("SENTIMENT CLASSIFICATION", style="bold blue")
     console.print("="*80 + "\n", style="bold blue")
     
-    prefix = "The sentiment is: "
-    sentiment_types = ["very negative", "negative", "neutral", "positive", "very positive"]
-    candidates = [prefix + s for s in sentiment_types]
+    prefix = "Sentiment classification: "
+    template = "It is <MASK>."
+    # ZuCo Task 1 (Sentiment) typically has these 3 classes
+    sentiment_types = ['negative', 'neutral', 'positive']
+    candidates = [prefix + template.replace("<MASK>", label) for label in sentiment_types]
     label_to_idx = {s: i for i, s in enumerate(sentiment_types)}
     
     results = []
     all_labels = []
     all_probs = []
+    seen_labels = set()  # Debug
     
     with torch.no_grad():
         for batch in track(dm.test_dataloader(), description="[EEG] Sentiment prediction"):
@@ -374,7 +390,8 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
             
             for i in range(len(eeg)):
                 sent_label = sentiment_labels[i] if i < len(sentiment_labels) else None
-                label_idx = label_to_idx.get(sent_label, -1) if sent_label else -1
+                seen_labels.add(sent_label)  # Debug
+                label_idx = label_to_idx.get(sent_label, -1) if sent_label and sent_label != 'nan' else -1
                 
                 if label_idx >= 0:
                     all_labels.append(label_idx)
@@ -389,6 +406,9 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
                     'pred': prob[i].argmax().item(),
                 })
     
+    # Debug: print unique labels seen in data
+    console.print(f"[dim]Unique sentiment labels in data: {seen_labels}[/dim]")
+    
     # EEG-based accuracy
     if all_probs:
         probs = torch.cat(all_probs, dim=0)
@@ -397,7 +417,7 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
         
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
-        probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device)
+        probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="Sentiment classification: <MASK>.")
         clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor.cpu(), num_classes=len(sentiment_types), top_k=1, average='micro')
         clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor.cpu(), num_classes=len(sentiment_types), top_k=1, average='micro')
     else:
