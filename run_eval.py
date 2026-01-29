@@ -96,8 +96,70 @@ def main():
     
     # Run Test
     print("Starting evaluation...")
-    trainer.test(model, datamodule=dm)
-    print("Evaluation complete! Check logs for metrics.")
+    test_results = trainer.test(model, datamodule=dm)
+    print("\n" + "="*80)
+    print("EVALUATION COMPLETE - SUMMARY OF KEY METRICS")
+    print("="*80)
+    
+    # Extract and display key metrics
+    if test_results and len(test_results) > 0:
+        metrics = test_results[0]  # Get first (and usually only) test result dict
+        
+        # Key metrics to display (using actual logged key names)
+        key_metrics = {
+            'Generation Metrics': [
+                ('test/mean_BLEU1@MTV', 'BLEU-1 (Generated)'),
+                ('test/mean_BLEU2@MTV', 'BLEU-2 (Generated)'),
+                ('test/mean_ROUGE1@MTV', 'ROUGE-1 Recall (Generated)'),
+                ('test/mean_ROUGE1@RAW', 'ROUGE-1 (Raw)'),
+            ],
+            'Classification Metrics': [
+                ('test/mean_corpus_cls_acc', 'Corpus Classification Accuracy'),
+                ('test/mean_relation_cls_acc_top01', 'Relation Classification (Top-1)'),
+                ('test/mean_relation_cls_acc_top03', 'Relation Classification (Top-3)'),
+                ('test/mean_sentiment_cls_acc_top01', 'Sentiment Classification (Top-1)'),
+            ],
+            'ETES Metrics (if available)': [
+                ('test/etes_alignment', 'ETES Alignment'),
+                ('test/etes_total', 'ETES Total'),
+                ('test/etes_reference', 'ETES Reference'),
+                ('test/etes_gap', 'ETES Gap'),
+            ],
+        }
+        
+        # Display metrics by category
+        for category, metric_list in key_metrics.items():
+            print(f"\n{category}:")
+            print("-" * 80)
+            found_any = False
+            for metric_key, metric_name in metric_list:
+                # Try different key formats (matching actual logged format)
+                value = None
+                # Try exact key first, then variations
+                for key_format in [
+                    metric_key,  # Try exact key first (e.g., 'test/mean_BLEU1@MTV')
+                    metric_key.replace('test/', ''),  # Without test/ prefix
+                    metric_key.replace('test/mean_', 'mean_'),  # Without test/ prefix but keep mean_
+                ]:
+                    if key_format in metrics:
+                        value = metrics[key_format]
+                        break
+                
+                if value is not None:
+                    # Handle tensor values
+                    if hasattr(value, 'item'):
+                        value = value.item()
+                    print(f"  {metric_name:.<50} {value:.4f}")
+                    found_any = True
+            
+            if not found_any and category == 'ETES Metrics (if available)':
+                print("  (ETES metrics not available - ensure --use_energy flag is set)")
+        
+        print("\n" + "="*80)
+        print("Full metrics are logged to wandb. Check logs for detailed breakdown.")
+        print("="*80)
+    else:
+        print("Evaluation complete! Check logs for metrics.")
 
 if __name__ == '__main__':
     main()

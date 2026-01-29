@@ -777,17 +777,34 @@ class GLIM(L.LightningModule):
                 for group_key, intermediates_list_dict in sorted(group_dict.items()):
                     intermediates = default_collate(intermediates_list_dict)
                     gen_strs_group = self.tokenizer.batch_decode(intermediates['gen_ids'], skip_special_tokens=True)
-                    ref_strs_group = self.tokenizer.batch_decode(intermediates['target_text_ids'], skip_special_tokens=True)
                     all_gen_strs.extend(gen_strs_group)
-                    all_ref_strs.extend(ref_strs_group)
                     all_eeg_embs.append(intermediates['eeg_emb_vector'])
+                    
+                    # Get reference texts - use target_text_ids if available, otherwise use all_target_text_ids
+                    if 'target_text_ids' in intermediates:
+                        ref_strs_group = self.tokenizer.batch_decode(intermediates['target_text_ids'], skip_special_tokens=True)
+                    elif 'all_target_text_ids' in intermediates:
+                        # Use first target text from all_target_text_ids as reference
+                        all_tgt_ids = intermediates['all_target_text_ids'].reshape(-1, self.tgt_text_len)
+                        ref_strs_group = self.tokenizer.batch_decode(all_tgt_ids[::self.trainer.datamodule.n_target_text], skip_special_tokens=True)
+                    else:
+                        # No reference texts available, skip this group for reference comparison
+                        ref_strs_group = None
+                    
+                    if ref_strs_group is not None:
+                        all_ref_strs.extend(ref_strs_group)
                 
                 all_eeg_embs = torch.cat(all_eeg_embs, dim=0)
-                etes_results = self.etes_evaluator.evaluate(
-                    eeg_emb_vectors=all_eeg_embs,
-                    generated_texts=all_gen_strs,
-                    reference_texts=all_ref_strs,
-                )
+                
+                # Only pass reference_texts if we have them
+                etes_kwargs = {
+                    'eeg_emb_vectors': all_eeg_embs,
+                    'generated_texts': all_gen_strs,
+                }
+                if all_ref_strs:
+                    etes_kwargs['reference_texts'] = all_ref_strs
+                
+                etes_results = self.etes_evaluator.evaluate(**etes_kwargs)
                 etes_metrics = {
                     f'{prefix}/etes_alignment': etes_results['etes_alignment'],
                     f'{prefix}/etes_total': etes_results['etes_total'],
@@ -796,7 +813,9 @@ class GLIM(L.LightningModule):
                 }
                 mean_metrics.update(etes_metrics)
             except Exception as e:
+                import traceback
                 print(f"[ETES] Evaluation failed: {e}")
+                print(f"[ETES] Traceback: {traceback.format_exc()}")
         
         if self.current_epoch == 0:
             self.define_metrics(list(all_group_metrics.keys())+list(mean_metrics.keys()))
