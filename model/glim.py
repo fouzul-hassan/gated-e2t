@@ -755,10 +755,23 @@ class GLIM(L.LightningModule):
         # ETES evaluation (if enabled)
         if self.use_etes_eval and self.etes_evaluator is not None:
             try:
+                # Collect all generated and reference texts across all groups
+                all_gen_strs = []
+                all_ref_strs = []
+                all_eeg_embs = []
+                for group_key, intermediates_list_dict in sorted(group_dict.items()):
+                    intermediates = default_collate(intermediates_list_dict)
+                    gen_strs_group = self.tokenizer.batch_decode(intermediates['gen_ids'], skip_special_tokens=True)
+                    ref_strs_group = self.tokenizer.batch_decode(intermediates['target_text_ids'], skip_special_tokens=True)
+                    all_gen_strs.extend(gen_strs_group)
+                    all_ref_strs.extend(ref_strs_group)
+                    all_eeg_embs.append(intermediates['eeg_emb_vector'])
+                
+                all_eeg_embs = torch.cat(all_eeg_embs, dim=0)
                 etes_results = self.etes_evaluator.evaluate(
-                    eeg_emb_vectors=outputs['eeg_emb_vector'],
-                    generated_texts=gen_strs,
-                    reference_texts=gen_tgt_strs,
+                    eeg_emb_vectors=all_eeg_embs,
+                    generated_texts=all_gen_strs,
+                    reference_texts=all_ref_strs,
                 )
                 etes_metrics = {
                     f'{prefix}/etes_alignment': etes_results['etes_alignment'],
