@@ -121,14 +121,29 @@ def main():
         offline=args.offline,
     )
     
-    # Callbacks
+    # Callbacks - Multiple checkpoint saving strategies
     callbacks = [
+        # Save every N epochs (all interval checkpoints)
         ModelCheckpoint(
             monitor='epoch',
             dirpath=os.path.join(log_dir, 'checkpoints'),
             save_top_k=-1,
             every_n_epochs=args.full_val_interval,
-            filename='epoch={epoch:03d}',
+            filename='interval-epoch={epoch:03d}',
+        ),
+        # Save top 3 best models based on validation retrieval accuracy
+        ModelCheckpoint(
+            monitor='val/retrieval_acc_top01',
+            mode='max',
+            dirpath=os.path.join(log_dir, 'checkpoints'),
+            save_top_k=3,
+            filename='best-epoch={epoch:03d}-acc={val/retrieval_acc_top01:.4f}',
+        ),
+        # Always save the last checkpoint
+        ModelCheckpoint(
+            dirpath=os.path.join(log_dir, 'checkpoints'),
+            save_last=True,
+            filename='last',
         ),
     ]
     

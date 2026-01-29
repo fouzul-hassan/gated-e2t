@@ -756,7 +756,7 @@ class GLIM(L.LightningModule):
         if self.use_etes_eval and self.etes_evaluator is not None:
             try:
                 etes_results = self.etes_evaluator.evaluate(
-                    eeg_emb_vectors=gathered_dict['eeg_emb_vector'],
+                    eeg_emb_vectors=outputs['eeg_emb_vector'],
                     generated_texts=gen_strs,
                     reference_texts=gen_tgt_strs,
                 )
