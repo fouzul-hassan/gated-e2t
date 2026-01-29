@@ -156,7 +156,11 @@ class GLIM(L.LightningModule):
                 temperature=0.07,
                 energy_type=self._energy_type,
                 hidden_dim=self._embed_dim,
-                learn_temperature=True
+                learn_temperature=True,
+                # Regularization to prevent overfitting
+                label_smoothing=0.1,  # Soften targets
+                embedding_dropout=0.1,  # Add noise
+                gradient_scale=1.0,  # Can reduce to 0.5 if still overfitting
             )
         else:
             self.energy_loss = None
@@ -378,7 +382,7 @@ class GLIM(L.LightningModule):
                    'loss_commitment': loss_commitment,
                    'loss_clip': loss_clip,              
                    'loss_lm': loss_lm, 
-                #    'learning_rate': self.lr_schedulers().get_last_lr()[0],
+                   'learning_rate': self.optimizers().param_groups[0]['lr'],
                     } 
         metrics.update(energy_metrics)
         metrics.update(gated_metrics)

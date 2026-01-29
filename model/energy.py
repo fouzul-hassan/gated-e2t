@@ -40,13 +40,22 @@ class EnergyContrastiveLoss(nn.Module):
     - More flexible energy landscapes than simple cosine similarity
     - Easy extension with additional energy terms (e.g., fluency, coherence)
     - Principled uncertainty estimation via partition function
+    
+    Regularization options (to prevent overfitting):
+    - label_smoothing: Soften the contrastive targets (prevents overconfident predictions)
+    - embedding_dropout: Add dropout to embeddings before energy computation
+    - gradient_scale: Scale down gradients from energy loss
     """
     
     def __init__(self, 
                  temperature: float = 0.07,
                  energy_type: Literal['cosine', 'bilinear', 'mlp'] = 'cosine',
                  hidden_dim: int = 1024,
-                 learn_temperature: bool = False):
+                 learn_temperature: bool = False,
+                 # Regularization options
+                 label_smoothing: float = 0.1,  # Smooth targets to prevent overconfidence
+                 embedding_dropout: float = 0.1,  # Dropout on embeddings
+                 gradient_scale: float = 1.0):  # Scale gradients (< 1.0 reduces impact)
         """
         Args:
             temperature: Softmax temperature (lower = sharper distributions)
@@ -56,10 +65,18 @@ class EnergyContrastiveLoss(nn.Module):
                 - 'mlp': E = MLP([x; y; x*y]) (most expressive)
             hidden_dim: Dimension of embeddings
             learn_temperature: Whether to learn temperature as a parameter
+            label_smoothing: Label smoothing factor (0.0 = no smoothing, 0.1 = 10% smoothing)
+            embedding_dropout: Dropout rate for embeddings during training
+            gradient_scale: Scale factor for gradients (1.0 = normal, 0.5 = half gradients)
         """
         super().__init__()
         
         self.energy_type = energy_type
+        self.label_smoothing = label_smoothing
+        self.gradient_scale = gradient_scale
+        
+        # Embedding dropout for regularization
+        self.embed_dropout = nn.Dropout(p=embedding_dropout)
         
         if learn_temperature:
             # Log-scale for numerical stability
@@ -131,7 +148,7 @@ class EnergyContrastiveLoss(nn.Module):
     def forward(self, eeg_emb: torch.Tensor, text_emb: torch.Tensor, 
                 return_metrics: bool = False) -> Dict[str, torch.Tensor]:
         """
-        Compute EBM contrastive loss.
+        Compute EBM contrastive loss with regularization.
         
         Args:
             eeg_emb: (B, D) EEG embeddings
@@ -144,21 +161,42 @@ class EnergyContrastiveLoss(nn.Module):
         B = eeg_emb.size(0)
         device = eeg_emb.device
         
+        # Apply embedding dropout for regularization (only during training)
+        if self.training:
+            eeg_emb = self.embed_dropout(eeg_emb)
+            text_emb = self.embed_dropout(text_emb)
+        
         # Compute pairwise energies
         energy = self.compute_energy(eeg_emb, text_emb)  # (B, B)
         
-        # Positive pairs are on the diagonal
-        positive_energy = energy.diag()  # (B,)
+        # Convert to logits (negative energy = higher probability)
+        logits = -energy  # (B, B)
         
-        # NCE loss: -log p(positive) = E_pos + log(sum_all exp(-E))
-        # Equivalent to: E_pos + logsumexp(-E)
-        log_partition_eeg = torch.logsumexp(-energy, dim=1)  # (B,)
-        log_partition_text = torch.logsumexp(-energy, dim=0)  # (B,)
+        # Create targets with label smoothing
+        if self.label_smoothing > 0:
+            # Soft targets: (1 - smoothing) for correct, smoothing/(B-1) for others
+            smooth_value = self.label_smoothing / (B - 1)
+            targets = torch.full((B, B), smooth_value, device=device)
+            targets.fill_diagonal_(1.0 - self.label_smoothing)
+            
+            # Cross entropy with soft targets
+            log_probs_eeg = F.log_softmax(logits, dim=1)
+            log_probs_text = F.log_softmax(logits, dim=0)
+            
+            loss_eeg_to_text = -(targets * log_probs_eeg).sum(dim=1).mean()
+            loss_text_to_eeg = -(targets * log_probs_text).sum(dim=0).mean()
+        else:
+            # Standard hard targets
+            labels = torch.arange(B, device=device)
+            loss_eeg_to_text = F.cross_entropy(logits, labels)
+            loss_text_to_eeg = F.cross_entropy(logits.T, labels)
         
-        # Symmetric loss (like CLIP)
-        loss_eeg_to_text = (positive_energy + log_partition_eeg).mean()
-        loss_text_to_eeg = (positive_energy + log_partition_text).mean()
         loss = (loss_eeg_to_text + loss_text_to_eeg) / 2
+        
+        # Apply gradient scaling (reduces energy loss impact during backprop)
+        if self.gradient_scale != 1.0 and self.training:
+            # Scale gradients by detaching and re-adding with scale
+            loss = loss * self.gradient_scale + loss.detach() * (1 - self.gradient_scale)
         
         result = {'loss': loss}
         
@@ -167,12 +205,13 @@ class EnergyContrastiveLoss(nn.Module):
             with torch.no_grad():
                 labels = torch.arange(B, device=device)
                 # Lower energy = higher probability of being the match
-                pred_eeg_to_text = (-energy).argmax(dim=1)
-                pred_text_to_eeg = (-energy).argmax(dim=0)
+                pred_eeg_to_text = logits.argmax(dim=1)
+                pred_text_to_eeg = logits.argmax(dim=0)
                 
                 acc_eeg_to_text = (pred_eeg_to_text == labels).float().mean()
                 acc_text_to_eeg = (pred_text_to_eeg == labels).float().mean()
                 
+                positive_energy = energy.diag()
                 result['acc_eeg_to_text'] = acc_eeg_to_text
                 result['acc_text_to_eeg'] = acc_text_to_eeg
                 result['mean_positive_energy'] = positive_energy.mean()
