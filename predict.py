@@ -223,8 +223,8 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
     
     # Text embedding accuracy
     probs_raw, probs_gen = compute_text_embedding_accuracy(model, results, candidates, device)
-    clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor.cpu(), num_classes=2, top_k=1, average='micro')
-    clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor.cpu(), num_classes=2, top_k=1, average='micro')
+    clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=2, top_k=1, average='micro')
+    clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=2, top_k=1, average='micro')
     
     # Results table
     table = Table(title="Corpus Classification Results")
@@ -315,8 +315,8 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="To English: <MASK>.")
-        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor.cpu(), num_classes=len(relation_types), top_k=1, average='micro')
-        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor.cpu(), num_classes=len(relation_types), top_k=1, average='micro')
+        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=1, average='micro')
+        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=1, average='micro')
     else:
         clip_acc1, clip_acc3, clip_acc_raw, clip_acc_gen = 0, 0, 0, 0
     
@@ -418,8 +418,8 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="Sentiment classification: <MASK>.")
-        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor.cpu(), num_classes=len(sentiment_types), top_k=1, average='micro')
-        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor.cpu(), num_classes=len(sentiment_types), top_k=1, average='micro')
+        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(sentiment_types), top_k=1, average='micro')
+        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(sentiment_types), top_k=1, average='micro')
     else:
         clip_acc1, clip_acc_raw, clip_acc_gen = 0, 0, 0
     
