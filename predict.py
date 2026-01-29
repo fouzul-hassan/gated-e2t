@@ -501,10 +501,10 @@ def main():
     
     summary_table = Table(title="All Results Summary")
     summary_table.add_column("Task", style="cyan")
-    summary_table.add_column("clip-like acc", style="green")
-    summary_table.add_column("clip-like [raw]", style="green")
-    summary_table.add_column("clip-like [gen]", style="green")
-    summary_table.add_column("llm-pred", style="green")
+    summary_table.add_column("EEG Accuracy", style="green")
+    summary_table.add_column("Text Acc (Raw)", style="green")
+    summary_table.add_column("Text Acc (Gen)", style="green")
+    summary_table.add_column("LLM Prediction", style="green")
     
     for task, data in all_results.items():
         clip_acc = data.get('clip_acc', data.get('clip_acc1', 0))
