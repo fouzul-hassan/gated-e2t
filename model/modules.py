@@ -188,6 +188,45 @@ class EEGEncoder(nn.Module):
         out = self.norm2(q)                                             # (n, l, d)
         return out, attn_weights
     
+    def get_gate_stats(self) -> dict:
+        """
+        Aggregate gate statistics from all gated attention layers.
+        Returns average stats across all encoder and decoder blocks.
+        """
+        gate_means = []
+        gate_stds = []
+        gate_sparsities = []
+        
+        # Collect from encoder blocks
+        for block in self.in_blocks:
+            if hasattr(block, 'attn') and hasattr(block.attn, 'get_gate_stats'):
+                stats = block.attn.get_gate_stats()
+                gate_means.append(stats['gate_mean'])
+                gate_stds.append(stats['gate_std'])
+                gate_sparsities.append(stats['gate_sparsity'])
+        
+        # Collect from decoder blocks
+        for block in self.out_blocks:
+            if hasattr(block, 'self_attn') and hasattr(block.self_attn, 'get_gate_stats'):
+                stats = block.self_attn.get_gate_stats()
+                gate_means.append(stats['gate_mean'])
+                gate_stds.append(stats['gate_std'])
+                gate_sparsities.append(stats['gate_sparsity'])
+            if hasattr(block, 'cross_attn') and hasattr(block.cross_attn, 'get_gate_stats'):
+                stats = block.cross_attn.get_gate_stats()
+                gate_means.append(stats['gate_mean'])
+                gate_stds.append(stats['gate_std'])
+                gate_sparsities.append(stats['gate_sparsity'])
+        
+        if len(gate_means) == 0:
+            return {'gate_mean': 0.0, 'gate_std': 0.0, 'gate_sparsity': 0.0}
+        
+        return {
+            'gate_mean': sum(gate_means) / len(gate_means),
+            'gate_std': sum(gate_stds) / len(gate_stds),
+            'gate_sparsity': sum(gate_sparsities) / len(gate_sparsities),
+        }
+
 
 class Aligner(nn.Module):
     '''
@@ -507,6 +546,12 @@ class GatedSelfAttention(nn.Module):
         # Compute query-dependent gates from input (not from output)
         gate = torch.sigmoid(self.gate_proj(x))  # (B, L, D) or (B, L, num_heads)
         
+        # Store gate statistics for monitoring (detached to avoid affecting gradients)
+        with torch.no_grad():
+            self._last_gate_mean = gate.mean().item()
+            self._last_gate_std = gate.std().item()
+            self._last_gate_sparsity = (gate < 0.1).float().mean().item()  # % of gates < 0.1
+        
         # Apply gating
         if self.gating_type == 'elementwise':
             # Elementwise gating: gate has shape (B, L, D)
@@ -518,6 +563,14 @@ class GatedSelfAttention(nn.Module):
             gated_output = (attn_output * gate).view(B, L, D)
         
         return gated_output
+    
+    def get_gate_stats(self) -> dict:
+        """Return the gate statistics from the last forward pass."""
+        return {
+            'gate_mean': getattr(self, '_last_gate_mean', 0.0),
+            'gate_std': getattr(self, '_last_gate_std', 0.0),
+            'gate_sparsity': getattr(self, '_last_gate_sparsity', 0.0),
+        }
 
 
 class GatedCrossAttention(nn.Module):
@@ -583,6 +636,12 @@ class GatedCrossAttention(nn.Module):
         # Compute query-dependent gates
         gate = torch.sigmoid(self.gate_proj(q))  # (B, Lq, D) or (B, Lq, num_heads)
         
+        # Store gate statistics for monitoring (detached to avoid affecting gradients)
+        with torch.no_grad():
+            self._last_gate_mean = gate.mean().item()
+            self._last_gate_std = gate.std().item()
+            self._last_gate_sparsity = (gate < 0.1).float().mean().item()
+        
         # Apply gating
         if self.gating_type == 'elementwise':
             gated_output = attn_output * gate
@@ -592,3 +651,11 @@ class GatedCrossAttention(nn.Module):
             gated_output = (attn_output * gate).view(B, Lq, D)
         
         return gated_output, attn_weights
+    
+    def get_gate_stats(self) -> dict:
+        """Return the gate statistics from the last forward pass."""
+        return {
+            'gate_mean': getattr(self, '_last_gate_mean', 0.0),
+            'gate_std': getattr(self, '_last_gate_std', 0.0),
+            'gate_sparsity': getattr(self, '_last_gate_sparsity', 0.0),
+        }

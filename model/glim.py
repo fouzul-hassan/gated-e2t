@@ -364,6 +364,16 @@ class GLIM(L.LightningModule):
         else:
             energy_metrics = {}
         
+        # Gated attention metrics (if enabled)
+        gated_metrics = {}
+        if hasattr(self.eeg_encoder, 'get_gate_stats'):
+            gate_stats = self.eeg_encoder.get_gate_stats()
+            gated_metrics = {
+                'gate_mean': gate_stats.get('gate_mean', 0.0),
+                'gate_std': gate_stats.get('gate_std', 0.0),
+                'gate_sparsity': gate_stats.get('gate_sparsity', 0.0),
+            }
+        
         metrics = {'loss': loss,
                    'loss_commitment': loss_commitment,
                    'loss_clip': loss_clip,              
@@ -371,6 +381,7 @@ class GLIM(L.LightningModule):
                 #    'learning_rate': self.lr_schedulers().get_last_lr()[0],
                     } 
         metrics.update(energy_metrics)
+        metrics.update(gated_metrics)
 
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)
         metrics.update(retrieval_metrics)
