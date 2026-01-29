@@ -208,11 +208,24 @@ def main():
     )
     
     # Train (with optional resume)
-    trainer.fit(
-        model,
-        datamodule=dm,
-        ckpt_path=args.resume_from,  # None = start fresh, path = resume
-    )
+    # GLIM checkpoints don't include frozen text_model weights, so we need special handling
+    if args.resume_from:
+        # Load checkpoint manually with strict=False
+        print(f"Loading checkpoint from {args.resume_from}...")
+        checkpoint = torch.load(args.resume_from, map_location=f"cuda:{gpu_ids[0]}")
+        
+        # Load state dict with strict=False (ignores missing text_model keys)
+        model.load_state_dict(checkpoint['state_dict'], strict=False)
+        
+        # Extract epoch number for logging
+        if 'epoch' in checkpoint:
+            print(f"Resuming from epoch {checkpoint['epoch']}")
+        
+        # Start training (without ckpt_path since we manually loaded)
+        trainer.fit(model, datamodule=dm)
+    else:
+        # Fresh start
+        trainer.fit(model, datamodule=dm)
 
 
 if __name__ == '__main__':
