@@ -144,26 +144,22 @@ class GLIM(L.LightningModule):
     def setup(self, stage):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.tokenizer = AutoTokenizer.from_pretrained(self.text_model_id)
-        self.text_model = T5ForConditionalGeneration.from_pretrained(
-            self.text_model_id, device_map = self.device,
-            torch_dtype = torch.bfloat16, # FIXME
+        
+        # Load appropriate model based on text_model_id
+        if 'bart' in self.text_model_id.lower():
+            self.text_model = BartForConditionalGeneration.from_pretrained(
+                self.text_model_id, device_map=self.device,
+                torch_dtype=torch.bfloat16,
+            ).requires_grad_(False)
+        else:  # T5 models (default)
+            self.text_model = T5ForConditionalGeneration.from_pretrained(
+                self.text_model_id, device_map=self.device,
+                torch_dtype=torch.bfloat16,
             ).requires_grad_(False)
         assert self.embed_dim == self.text_model.config.d_model
 
-        # Initialize energy-based components if enabled
-        if self.use_energy_loss:
-            self.energy_loss = EnergyContrastiveLoss(
-                temperature=0.07,
-                energy_type=self._energy_type,
-                hidden_dim=self._embed_dim,
-                learn_temperature=True,
-                # Regularization to prevent overfitting
-                label_smoothing=0.1,  # Soften targets
-                embedding_dropout=0.1,  # Add noise
-                gradient_scale=1.0,  # Can reduce to 0.5 if still overfitting
-            )
-        else:
-            self.energy_loss = None
+        # Energy loss removed - using default CLS loss only
+        # ETES evaluation is still available via use_etes_eval flag
         
         # Initialize energy-guided generator if using energy decoding
         if self.generation_strategy == 'energy':
@@ -350,23 +346,8 @@ class GLIM(L.LightningModule):
         loss_lm = shared_outputs['loss_lm']                     # (1)
         loss = self.λ * loss_clip + (1-self.λ) * loss_lm + self.ε * loss_commitment
         
-        # Energy-based loss (if enabled)
-        if self.use_energy_loss and self.energy_loss is not None:
-            energy_result = self.energy_loss(
-                shared_outputs['eeg_emb_vector'],
-                shared_outputs['text_emb_vector'],
-                return_metrics=True
-            )
-            loss_energy = energy_result['loss']
-            loss = loss + self.energy_loss_weight * loss_energy
-            energy_metrics = {
-                'loss_energy': loss_energy,
-                'energy_acc_e2t': energy_result.get('acc_eeg_to_text', 0.0),
-                'energy_acc_t2e': energy_result.get('acc_text_to_eeg', 0.0),
-                'energy_temperature': energy_result.get('temperature', 0.07),
-            }
-        else:
-            energy_metrics = {}
+        # Energy-based loss removed - using default CLS loss only
+        # (ETES evaluation still available during validation via use_etes_eval)
         
         # Gated attention metrics (if enabled)
         gated_metrics = {}
@@ -384,7 +365,6 @@ class GLIM(L.LightningModule):
                    'loss_lm': loss_lm, 
                    'learning_rate': self.optimizers().param_groups[0]['lr'],
                     } 
-        metrics.update(energy_metrics)
         metrics.update(gated_metrics)
 
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)
@@ -412,16 +392,8 @@ class GLIM(L.LightningModule):
                    'loss_lm': loss_lm,         
                     } 
         
-        # Energy-based metrics (if enabled)
-        if self.use_energy_loss and self.energy_loss is not None:
-            energy_result = self.energy_loss(
-                shared_outputs['eeg_emb_vector'],
-                shared_outputs['text_emb_vector'],
-                return_metrics=True
-            )
-            metrics['loss_energy'] = energy_result['loss']
-            metrics['energy_acc_e2t'] = energy_result.get('acc_eeg_to_text', 0.0)
-            metrics['energy_acc_t2e'] = energy_result.get('acc_text_to_eeg', 0.0)
+        # Energy-based metrics removed from validation
+        # ETES evaluation still runs during full validation via cal_and_log()
 
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)  
         # NOTE: only for checkpointing here, allowing smaller batch size

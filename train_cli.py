@@ -76,6 +76,12 @@ def parse_args():
     parser.add_argument('--energy_loss_weight', type=float, default=0.3,
                         help='Weight for energy contrastive loss')
     
+    # Loss weights
+    parser.add_argument('--clip_loss_weight', type=float, default=0.5,
+                        help='Weight for CLIP contrastive loss (λ in paper)')
+    parser.add_argument('--commitment_loss_weight', type=float, default=0.0,
+                        help='Weight for commitment loss')
+    
     # Logging
     parser.add_argument('--project_name', type=str, default='glim',
                         help='WandB project name')
@@ -199,8 +205,11 @@ def main():
         energy_loss_weight=args.energy_loss_weight,
         use_etes_eval=args.use_energy,
         
+        # Loss weights
+        clip_loss_weight=args.clip_loss_weight,
+        commitment_loss_weight=args.commitment_loss_weight,
+        
         # Standard config
-        clip_loss_weight=0.5,
         lr=args.lr,
         bsz_train=args.batch_size,
         bsz_val=args.val_batch_size,

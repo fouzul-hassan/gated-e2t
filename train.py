@@ -73,6 +73,10 @@ model = GLIM(input_eeg_len = 1280,
              n_out_blocks = 6,
              in_temporal_modulate = True,
              out_is_causal = True,
+             # Gated Attention (NeurIPS 2025 Best Paper)
+             use_gated_attention = True,
+             gating_type = 'elementwise',  # 'elementwise' or 'headwise'
+             # Loss Configuration
              prompt_tuning_len = 0,
              dropout = 0,
              clip_loss_weight = 0.5,
