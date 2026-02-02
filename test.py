@@ -44,6 +44,7 @@ model = GLIM.load_from_checkpoint(
     "checkpoints/glim-zuco-epoch=199-step=49600.ckpt",
     map_location = f"cuda:{devices[0]}",
     strict = False,
+    use_etes_eval = True,  # Enable ETES evaluation
     # evaluate_prompt_embed = 'zero',
     # prompt_dropout_probs = (0.0, 0.1, 0.1),
     )
