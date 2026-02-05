@@ -188,44 +188,107 @@ class EEGEncoder(nn.Module):
         out = self.norm2(q)                                             # (n, l, d)
         return out, attn_weights
     
-    def get_gate_stats(self) -> dict:
+    def get_gate_stats(self, include_values: bool = False) -> dict:
         """
         Aggregate gate statistics from all gated attention layers.
-        Returns average stats across all encoder and decoder blocks.
+        Returns both aggregate and per-layer stats for XAI logging.
+        
+        Args:
+            include_values: If True, include raw gate values for histogram visualization
+            
+        Returns:
+            Dictionary with 'aggregate', 'per_layer', 'gate_entropy', and optionally 'all_gate_values'
         """
         gate_means = []
         gate_stds = []
         gate_sparsities = []
+        per_layer_stats = []
+        all_gate_values = []
         
         # Collect from encoder blocks
-        for block in self.in_blocks:
+        for i, block in enumerate(self.in_blocks):
             if hasattr(block, 'attn') and hasattr(block.attn, 'get_gate_stats'):
                 stats = block.attn.get_gate_stats()
                 gate_means.append(stats['gate_mean'])
                 gate_stds.append(stats['gate_std'])
                 gate_sparsities.append(stats['gate_sparsity'])
+                per_layer_stats.append({
+                    'name': f'Encoder_{i}_SelfAttn',
+                    'gate_mean': stats['gate_mean'],
+                    'gate_std': stats['gate_std'],
+                    'gate_sparsity': stats['gate_sparsity']
+                })
+                if include_values and hasattr(block.attn, '_last_gate_values'):
+                    all_gate_values.append(block.attn._last_gate_values)
         
         # Collect from decoder blocks
-        for block in self.out_blocks:
+        for j, block in enumerate(self.out_blocks):
             if hasattr(block, 'self_attn') and hasattr(block.self_attn, 'get_gate_stats'):
                 stats = block.self_attn.get_gate_stats()
                 gate_means.append(stats['gate_mean'])
                 gate_stds.append(stats['gate_std'])
                 gate_sparsities.append(stats['gate_sparsity'])
+                per_layer_stats.append({
+                    'name': f'Decoder_{j}_SelfAttn',
+                    'gate_mean': stats['gate_mean'],
+                    'gate_std': stats['gate_std'],
+                    'gate_sparsity': stats['gate_sparsity']
+                })
+                if include_values and hasattr(block.self_attn, '_last_gate_values'):
+                    all_gate_values.append(block.self_attn._last_gate_values)
+                    
             if hasattr(block, 'cross_attn') and hasattr(block.cross_attn, 'get_gate_stats'):
                 stats = block.cross_attn.get_gate_stats()
                 gate_means.append(stats['gate_mean'])
                 gate_stds.append(stats['gate_std'])
                 gate_sparsities.append(stats['gate_sparsity'])
+                per_layer_stats.append({
+                    'name': f'Decoder_{j}_CrossAttn',
+                    'gate_mean': stats['gate_mean'],
+                    'gate_std': stats['gate_std'],
+                    'gate_sparsity': stats['gate_sparsity']
+                })
+                if include_values and hasattr(block.cross_attn, '_last_gate_values'):
+                    all_gate_values.append(block.cross_attn._last_gate_values)
         
         if len(gate_means) == 0:
-            return {'gate_mean': 0.0, 'gate_std': 0.0, 'gate_sparsity': 0.0}
+            return {
+                'aggregate': {'gate_mean': 0.0, 'gate_std': 0.0, 'gate_sparsity': 0.0},
+                'per_layer': [],
+                'gate_entropy': 0.0
+            }
         
-        return {
+        # Compute aggregate stats
+        aggregate = {
             'gate_mean': sum(gate_means) / len(gate_means),
             'gate_std': sum(gate_stds) / len(gate_stds),
             'gate_sparsity': sum(gate_sparsities) / len(gate_sparsities),
         }
+        
+        # Compute gate entropy (diversity of gating)
+        gate_entropy = 0.0
+        if all_gate_values:
+            try:
+                from .xai_logging import compute_gate_entropy
+                combined_gates = torch.cat([g.flatten() for g in all_gate_values])
+                gate_entropy = compute_gate_entropy(combined_gates)
+            except (ImportError, Exception):
+                pass
+        
+        result = {
+            'aggregate': aggregate,
+            'per_layer': per_layer_stats,
+            'gate_entropy': gate_entropy,
+            # Also include flat keys for backward compatibility
+            'gate_mean': aggregate['gate_mean'],
+            'gate_std': aggregate['gate_std'],
+            'gate_sparsity': aggregate['gate_sparsity'],
+        }
+        
+        if include_values and all_gate_values:
+            result['all_gate_values'] = torch.cat([g.flatten() for g in all_gate_values])
+        
+        return result
 
 
 class Aligner(nn.Module):
@@ -551,6 +614,7 @@ class GatedSelfAttention(nn.Module):
             self._last_gate_mean = gate.mean().item()
             self._last_gate_std = gate.std().item()
             self._last_gate_sparsity = (gate < 0.1).float().mean().item()  # % of gates < 0.1
+            self._last_gate_values = gate.detach()  # Store for XAI visualization
         
         # Apply gating
         if self.gating_type == 'elementwise':
@@ -641,6 +705,7 @@ class GatedCrossAttention(nn.Module):
             self._last_gate_mean = gate.mean().item()
             self._last_gate_std = gate.std().item()
             self._last_gate_sparsity = (gate < 0.1).float().mean().item()
+            self._last_gate_values = gate.detach()  # Store for XAI visualization
         
         # Apply gating
         if self.gating_type == 'elementwise':

@@ -60,6 +60,9 @@ class GLIM(L.LightningModule):
                  energy_type: Literal['cosine', 'bilinear', 'mlp'] = 'cosine',
                  use_etes_eval: bool = False,  # Enable ETES evaluation metric
                  energy_rerank_candidates: int = 5,  # Candidates for energy reranking
+                 # XAI Logging Configuration
+                 log_xai: bool = True,  # Enable XAI logging to WandB
+                 xai_num_attention_samples: int = 4,  # Number of attention samples to visualize
                  # Loss weights
                  clip_loss_weight = 0.5,
                  commitment_loss_weight = 0.0,
@@ -96,6 +99,10 @@ class GLIM(L.LightningModule):
         # Initialize energy loss if enabled (actual module created in setup())
         self._energy_type = energy_type
         self._embed_dim = embed_dim  # Store for energy loss initialization
+
+        # XAI logging configuration
+        self.log_xai = log_xai
+        self.xai_num_attention_samples = xai_num_attention_samples
 
         self.λ = clip_loss_weight
         self.ε = commitment_loss_weight
@@ -357,6 +364,7 @@ class GLIM(L.LightningModule):
                 'gate_mean': gate_stats.get('gate_mean', 0.0),
                 'gate_std': gate_stats.get('gate_std', 0.0),
                 'gate_sparsity': gate_stats.get('gate_sparsity', 0.0),
+                'gate_entropy': gate_stats.get('gate_entropy', 0.0),
             }
         
         metrics = {'loss': loss,
@@ -803,6 +811,24 @@ class GLIM(L.LightningModule):
         # mean_metrics = {k: v.to(self.device) for k, v in mean_metrics.items()}
         self.log_dict(all_group_metrics, rank_zero_only=True)
         self.log_dict(mean_metrics, rank_zero_only=True)
+        
+        # XAI Logging - visualizations for gated attention
+        if self.log_xai and hasattr(self.eeg_encoder, 'get_gate_stats'):
+            try:
+                from .xai_logging import log_xai_to_wandb
+                gate_stats = self.eeg_encoder.get_gate_stats(include_values=True)
+                log_xai_to_wandb(
+                    logger=self.logger,
+                    gate_stats=gate_stats,
+                    attn_weights_dict=None,  # Attention weights collected separately if needed
+                    prefix=prefix,
+                    current_epoch=self.current_epoch,
+                    max_attention_samples=self.xai_num_attention_samples
+                )
+            except Exception as e:
+                import traceback
+                print(f"[XAI] Logging failed: {e}")
+                print(f"[XAI] Traceback: {traceback.format_exc()}")
         
         sample_metrics = pd.DataFrame(all_rows)
         self.logger.log_table(key=f'{prefix}/Samples', dataframe=sample_metrics)
