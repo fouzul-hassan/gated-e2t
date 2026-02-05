@@ -45,6 +45,7 @@ model = GLIM.load_from_checkpoint(
     map_location = f"cuda:{devices[0]}",
     strict = False,
     use_etes_eval = True,  # Enable ETES evaluation
+    log_xai = True,  # Enable XAI logging (gate stats, histograms)
     # evaluate_prompt_embed = 'zero',
     # prompt_dropout_probs = (0.0, 0.1, 0.1),
     )
