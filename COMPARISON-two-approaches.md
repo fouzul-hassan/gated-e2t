@@ -39,8 +39,8 @@ Both use the same data (`zuco_eeg_label_8variants.df`), `--use_energy`, and gate
 
 | Run | Checkpoint | Decoding (inferred) | BLEU-1 (gen) | BLEU-2 (gen) | ROUGE-1 | Corpus cls acc | Relation top-1 | Sentiment top-1 | ETES Total |
 |-----|------------|----------------------|---------------|--------------|---------|----------------|----------------|-----------------|------------|
-| 1 | glim-nucleus-gated-energy | beam (default) | **0.1827** | 0.0645 | 0.1621 | 0.5530 | 0.2347 | 0.3573 | **-0.0265** |
-| 2 | glim-beam-gated-energy    | beam (default) | **0.2440** | 0.0864 | 0.2194 | 0.6916 | 0.0316 | 0.2950 | -0.3985 |
+| 1 | with-energy | beam (default) | **0.1827** | 0.0645 | 0.1621 | 0.5530 | 0.2347 | 0.3573 | **-0.0265** |
+| 2 | without-energy    | beam (default) | **0.2440** | 0.0864 | 0.2194 | 0.6916 | 0.0316 | 0.2950 | -0.3985 |
 
 So with **same decoding (beam)**:
 - **Beam-trained** checkpoint gives higher BLEU-1/ROUGE and corpus accuracy.
@@ -70,7 +70,7 @@ Notes:
 
 **Summary table (from prediction-results.txt):**
 
-| Task | Metric | Nucleus-trained | Beam-trained |
+| Task | Metric | with-energy | without-energy |
 |------|--------|-----------------|--------------|
 | **Corpus** | clip-like acc (EEG) | 0.5530 | **0.6916** |
 | | clip-like (text raw) | **0.7034** | 0.5915 |
