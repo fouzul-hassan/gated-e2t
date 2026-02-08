@@ -11,5 +11,3 @@ data/tmp/zuco_eeg_label_8variants.df
 *.zip
 
 glim-trained-checkpoint/*.ckpt
-
-*.txt
