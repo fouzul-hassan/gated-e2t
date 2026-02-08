@@ -152,20 +152,29 @@ def main():
     # Create model
     print("\n🔧 Creating model...")
     args = ckpt.get('args', {})
+    
+    # Infer actual patch_size from checkpoint (args may be incorrect)
+    pos_embed_shape = ckpt['model_state_dict']['pos_embed'].shape
+    n_patches = pos_embed_shape[1]
+    actual_patch_size = 1280 // n_patches
+    
+    print(f"  Detected {n_patches} patches in checkpoint")
+    print(f"  => Inferred patch_size: {actual_patch_size} (args said: {args.get('patch_size')})")
+    
     model = GLIMEncoderPretrainer(
         in_len=1280,
         in_dim=128,
         emb_size=args.get('emb_size', 128),
         n_blocks=args.get('n_blocks', 6),
         num_heads=args.get('num_heads', 8),
-        patch_size=args.get('patch_size', 8),
+        patch_size=actual_patch_size,  # Use inferred value
         mask_ratio=args.get('mask_ratio', 0.5),
         momentum=args.get('momentum', 0.99),
         use_gated_attention=args.get('use_gated_attention', False),
     ).to(device)
     
     print(f"  Model config: emb_size={args.get('emb_size')}, n_blocks={args.get('n_blocks')}, "
-          f"patch_size={args.get('patch_size')}, num_heads={args.get('num_heads')}")
+          f"patch_size={actual_patch_size}, num_heads={args.get('num_heads')}")
     
     # Load weights
     model.load_state_dict(ckpt['model_state_dict'])
