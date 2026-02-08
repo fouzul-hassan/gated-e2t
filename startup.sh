@@ -6,7 +6,7 @@ python3 -m pip install --upgrade pip
 
 echo "🔹 Cloning GLIM repo"
 git clone https://github.com/fouzul-hassan/energy-gated-glim.git
-cd energy-gated-glim
+cd gated-e2t
 
 echo "🔹 Installing requirements"
 pip install -r requirements.txt

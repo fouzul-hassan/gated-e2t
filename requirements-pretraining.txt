@@ -1,45 +1,35 @@
-# GLIM: Grounded Language-Image Model for EEG-to-Text
-# Requirements based on environment.yml
-# Compatible with Python 3.9+
+# GLIM Pretraining Requirements
+# Python 3.9 or 3.10 recommended (3.11 may have compatibility issues with some packages)
 
 # =============================================================================
-# Core Deep Learning (updated for RTX 5090 / Blackwell support)
+# Core Deep Learning
 # =============================================================================
-torch>=2.8.0
-lightning>=2.4.0
-torchmetrics>=1.3.1
+torch>=2.0.0
+lightning>=2.0.0
+torchmetrics>=1.0.0
 
 # =============================================================================
-# Transformers & NLP (from environment.yml)
+# Transformers & NLP (for GLIM integration)
 # =============================================================================
-transformers>=4.45.0
-tokenizers>=0.15.0
+transformers>=4.30.0
+tokenizers>=0.13.0
 sentencepiece>=0.1.99
-peft==0.12.0
-evaluate==0.4.*
-einops==0.8.0
+peft>=0.4.0
+einops>=0.6.0
 
 # =============================================================================
-# Vision Models (from environment.yml)
+# Data Processing
 # =============================================================================
-timm==0.9.16
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+scikit-learn>=1.3.0  # For LinearProbe evaluation
 
 # =============================================================================
-# Data Processing (from environment.yml)
+# Logging & Visualization
 # =============================================================================
-numpy==1.26.4
-pandas==2.2.*
-scipy==1.11.4
-
-# =============================================================================
-# Experiment Tracking & Logging
-# =============================================================================
-wandb>=0.12.10
-
-# =============================================================================
-# Progress & Visualization (from environment.yml)
-# =============================================================================
-rich==13.7.1
+tensorboard>=2.13.0  # For pretraining logging
+wandb>=0.15.0        # Optional: for cloud logging
 tqdm>=4.65.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
@@ -52,14 +42,14 @@ omegaconf>=2.3.0
 huggingface_hub
 
 # =============================================================================
-# Optional: For Jupyter Notebooks (from environment.yml)
+# Optional: For Jupyter Notebooks
 # =============================================================================
-notebook==7.0.*
+notebook>=7.0.0
 ipywidgets>=8.0.0
 
 # =============================================================================
 # Optional: For accelerated training (uncomment if needed)
 # =============================================================================
-bitsandbytes>=0.41.0  # For 8-bit quantization
-flash-attn>=2.3.0     # For Flash Attention (requires CUDA)
-xformers>=0.0.22      # For memory-efficient attention
+# bitsandbytes>=0.41.0  # For 8-bit quantization
+# flash-attn>=2.3.0     # For Flash Attention (requires CUDA 11.8+)
+# xformers>=0.0.22      # For memory-efficient attention

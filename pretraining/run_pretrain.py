@@ -4,6 +4,8 @@ Training script for GLIM-compatible EEG encoder pretraining.
 Usage:
     python run_pretrain.py --data_path ../data/tmp/zuco_eeg_128ch_1280len.df --epochs 100
 """
+from __future__ import annotations
+
 import os
 import sys
 import argparse
@@ -157,9 +159,9 @@ def main():
     test_dataset = ZuCoDataset(data['test_data'], data['test_label'], args.patch_size)
     
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
-                              num_workers=4, pin_memory=True)
+                              num_workers=2, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
-                             num_workers=4, pin_memory=True)
+                             num_workers=2, pin_memory=True)
     
     logger.info(f"Train samples: {len(train_dataset)}, Test samples: {len(test_dataset)}")
     

@@ -1,0 +1,17 @@
+# Minimal GLIM Pretraining Requirements
+# Compatible with Python 3.9, 3.10, 3.11+
+
+# Core Deep Learning - install PyTorch first separately based on your CUDA version
+# Visit: https://pytorch.org/get-started/locally/
+# Example: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# After PyTorch is installed, install these:
+numpy<2.0
+pandas
+scipy
+scikit-learn
+tqdm
+tensorboard
+matplotlib
+seaborn
+pyyaml
