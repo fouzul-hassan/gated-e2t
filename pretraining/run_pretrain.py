@@ -21,7 +21,7 @@ from tqdm import tqdm
 # Add parent directory to path for GLIM imports
 sys.path.insert(0, '..')
 
-from Dataset.zuco_dataset import load_zuco, ZuCoDataset
+from Dataset.zuco_memmap import load_zuco_memmap
 from pretrain_glim_encoder import GLIMEncoderPretrainer, count_parameters
 
 # For linear probe evaluation
@@ -150,25 +150,23 @@ def main():
     # Output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Load data
-    logger.info(f"Loading data from {args.data_path}")
-    data = load_zuco(args.data_path, seed=args.seed)
+    # Load data with memory mapping (LOW RAM USAGE!)
+    logger.info(f"Loading data from {args.data_path} (memory-mapped)")
+    datasets = load_zuco_memmap(args.data_path, seed=args.seed)
     
-    # Create datasets
-    train_dataset = ZuCoDataset(data['All_train_data'], data['All_train_label'], args.patch_size)
-    test_dataset = ZuCoDataset(data['test_data'], data['test_label'], args.patch_size)
-    
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
+    # Create DataLoaders
+    train_loader = DataLoader(datasets['train'], batch_size=args.batch_size, shuffle=True, 
                               num_workers=2, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
+    test_loader = DataLoader(datasets['test'], batch_size=args.batch_size, shuffle=False,
                              num_workers=2, pin_memory=True)
     
-    logger.info(f"Train samples: {len(train_dataset)}, Test samples: {len(test_dataset)}")
+    logger.info(f"Train samples: {len(datasets['train'])}, Test samples: {len(datasets['test'])}")
+
     
     # Create model
     model = GLIMEncoderPretrainer(
-        in_len=data['max_len'],  # 1280
-        in_dim=data['num_channels'],  # 128
+        in_len=1280,  # ZuCo timesteps
+        in_dim=128,   # ZuCo channels
         emb_size=args.emb_size,
         n_blocks=args.n_blocks,
         num_heads=args.num_heads,
