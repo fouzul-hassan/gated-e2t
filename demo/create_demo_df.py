@@ -19,6 +19,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torchmetrics.functional.text import bleu_score, rouge_score, word_error_rate
+from model.energy import ETESEvaluator
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 RESULTS_PKL  = '../data/tmp/glim_gen_results.pkl'
@@ -73,6 +74,33 @@ def compute_text_metrics(gen: str, raw_input: str, variants: list[str]) -> dict:
         metrics[f'rouge1_{k}_raw'] = r_raw[f'rouge1_{k}']
     metrics['wer'] = safe_wer(gen, raw_input)
     return metrics
+
+
+def summarize_attention_weights(attn_weights: dict) -> dict:
+    """Collapse per-layer attention tensors into a single heatmap-friendly summary."""
+    matrices = []
+    for _, weights in sorted(attn_weights.items()):
+        if weights is None:
+            continue
+        tensor = weights.detach()
+        if tensor.dim() == 4:
+            tensor = tensor[0]
+        if tensor.dim() == 3:
+            tensor = tensor[0]
+        if tensor.dim() != 2:
+            continue
+        matrices.append(tensor.float())
+
+    if not matrices:
+        return {}
+
+    stacked = torch.stack(matrices, dim=0)
+    mean_matrix = stacked.mean(dim=0)
+    return {
+        'attention_matrix': mean_matrix.cpu().tolist(),
+        'attention_profile': mean_matrix.mean(dim=0).cpu().tolist(),
+        'attention_layers': len(matrices),
+    }
 
 
 # ── Discovery / selection ─────────────────────────────────────────────────────
@@ -140,6 +168,12 @@ def precompute_classification(demo_df: pd.DataFrame, ckpt_path: str, version: st
     model.setup(stage='test')
     model.eval().to(device)
     tokenizer = model.tokenizer
+    etes_evaluator = model.etes_evaluator or ETESEvaluator(
+        aligner=model.aligner,
+        text_encoder=model.text_model.get_encoder(),
+        tokenizer=model.tokenizer,
+        include_fluency=False,
+    )
 
     # Candidate embeddings
     sentiment_labels = ['negative', 'neutral', 'positive']
@@ -173,7 +207,7 @@ def precompute_classification(demo_df: pd.DataFrame, ckpt_path: str, version: st
             # Encode EEG
             prompt_ids   = model.p_embedder.encode(prompts, device=device)
             prompt_embed = model.p_embedder(prompt_ids, model.eval_pembed)
-            eeg_hiddens, _ = model.eeg_encoder(eeg, mask, prompt_embed)
+            eeg_hiddens, attn_weights = model.eeg_encoder(eeg, mask, prompt_embed, need_weights=True)
             eeg_embeds, eeg_emb = model.aligner.embed_eeg(eeg_hiddens)
             if eeg_emb.dim() == 1: eeg_emb = eeg_emb.unsqueeze(0)
 
@@ -202,8 +236,21 @@ def precompute_classification(demo_df: pd.DataFrame, ckpt_path: str, version: st
                     do_sample=False, num_beams=2, min_length=0, max_length=model.tgt_text_len)
             gen_text = tokenizer.decode(gen_ids[0], skip_special_tokens=True)
 
+            raw_input = str(row['input text'])
+            etes_results = {}
+            try:
+                etes_results = etes_evaluator.evaluate(
+                    eeg_emb_vectors=eeg_emb.detach(),
+                    generated_texts=[gen_text],
+                    reference_texts=[raw_input],
+                )
+            except Exception as exc:
+                print(f"  [WARN] ETES failed for sample {idx}: {exc}")
+
             result = {
                 'gen_text':           gen_text,
+                'eeg_emb_vector':     eeg_emb.detach().float().cpu().tolist(),
+                **summarize_attention_weights(attn_weights),
                 'sentiment_probs':    cls_probs(se_embs),
                 'sentiment_labels':   sentiment_labels,
                 'relation_probs':     cls_probs(re_embs),
@@ -212,6 +259,12 @@ def precompute_classification(demo_df: pd.DataFrame, ckpt_path: str, version: st
                 'corpus_labels':      ['movie review', 'biography'],
                 'paradigm_probs':     paradigm_probs(),
                 'paradigm_labels':    ['NR', 'TSR'],
+                'etes_metrics':       {
+                    'etes_alignment': etes_results.get('etes_alignment', 0.0),
+                    'etes_total': etes_results.get('etes_total', 0.0),
+                    'etes_reference': etes_results.get('etes_reference', 0.0),
+                    'etes_gap': etes_results.get('etes_gap', 0.0),
+                },
             }
             # Add text metrics with live gen text
             variants = [row.get(k, '') for k in VARIANT_KEYS]

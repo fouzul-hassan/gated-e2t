@@ -11,7 +11,7 @@ Launch:
     python app.py                                  # opens http://localhost:7860
     python app.py --share                          # + public Gradio link
 """
-import sys, os, glob, json, argparse
+import sys, os, glob, json, argparse, subprocess
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
@@ -22,7 +22,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from visualise import butterfly_plot, topomap_grid
+from visualise import (
+    butterfly_plot,
+    eeg_feature_space_plot,
+    eeg_spectrogram_plot,
+)
 from inference import (discover_all_checkpoints, run_inference,
                        SENTIMENT_LABELS, RELATION_LABELS,
                        CORPUS_DISPLAY, PARADIGM_DISPLAY,
@@ -39,9 +43,31 @@ DEVICE       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # ─────────────────────────────────────────────────────────────────────────────
 # Load demo dataset once
 # ─────────────────────────────────────────────────────────────────────────────
-print("Loading demo dataset …")
-demo_df   = pd.read_pickle(DEMO_DF_PATH)
-CKPT_MAP  = discover_all_checkpoints()       # e.g. {'v1': '…/epoch=199.ckpt', 'v2': '…'}
+def load_or_rebuild_demo_df(demo_df_path: str) -> pd.DataFrame:
+    """Load demo dataframe; auto-rebuild if pickle is incompatible."""
+    try:
+        return pd.read_pickle(demo_df_path)
+    except Exception as exc:
+        print(f"  [WARN] Could not read demo dataframe ({type(exc).__name__}: {exc})")
+        print("  Attempting to regenerate demo dataframe using create_demo_df.py ...")
+
+        create_script = os.path.join(os.path.dirname(__file__), 'create_demo_df.py')
+        cmd = [sys.executable, create_script]
+        try:
+            subprocess.run(cmd, check=True)
+        except Exception as rebuild_exc:
+            raise RuntimeError(
+                "Failed to auto-regenerate demo dataframe. "
+                "Run 'python create_demo_df.py' inside demo/ and retry."
+            ) from rebuild_exc
+
+        # Retry load after successful regeneration
+        return pd.read_pickle(demo_df_path)
+
+
+print("Loading demo dataset ...")
+demo_df   = load_or_rebuild_demo_df(DEMO_DF_PATH)
+CKPT_MAP  = discover_all_checkpoints()       # e.g. {'v1': '.../epoch=199.ckpt', 'v2': '...'}
 print(f"  {len(demo_df)} samples  |  checkpoints: {list(CKPT_MAP.keys())}")
 
 
@@ -94,6 +120,33 @@ def render_generation_table(tm: dict) -> pd.DataFrame:
     rows.append({'Metric': 'WER',
                  '@MTV (multi-target)': '—',
                  '@RAW (vs input)':     f"{tm.get('wer', 0):.4f}"})
+    return pd.DataFrame(rows)
+
+
+def render_etes_table(etes: dict) -> pd.DataFrame:
+    """Turn ETES metrics into a displayable DataFrame."""
+    rows = [
+        {
+            'Metric': 'ETES alignment',
+            'Score': f"{etes.get('etes_alignment', 0.0):.4f}" if etes else '—',
+            'Note': 'Lower is better; generated text vs EEG',
+        },
+        {
+            'Metric': 'ETES total',
+            'Score': f"{etes.get('etes_total', 0.0):.4f}" if etes else '—',
+            'Note': 'Includes fluency only if enabled in the model',
+        },
+        {
+            'Metric': 'ETES reference',
+            'Score': f"{etes.get('etes_reference', 0.0):.4f}" if etes else '—',
+            'Note': 'Raw input text vs EEG',
+        },
+        {
+            'Metric': 'ETES gap',
+            'Score': f"{etes.get('etes_gap', 0.0):.4f}" if etes else '—',
+            'Note': 'Generated - reference; lower is better',
+        },
+    ]
     return pd.DataFrame(rows)
 
 
@@ -158,11 +211,49 @@ def compute_pseudo_snr_db(eeg: np.ndarray, mask: np.ndarray) -> float:
     return 20 * np.log10(peak / rms) if rms > 0 else 0.0
 
 
+def compute_saliency_profile(eeg: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Fallback saliency proxy from channel RMS over time."""
+    valid_len = int(mask.sum())
+    if valid_len == 0:
+        return np.array([], dtype=np.float32)
+    valid = eeg[:valid_len]
+    saliency = np.sqrt(np.mean(valid ** 2, axis=1))
+    return saliency / (saliency.max() + 1e-8)
+
+
+def attention_matrix_from_result(result: dict) -> np.ndarray | None:
+    """Return a heatmap-ready attention matrix if the model provided one."""
+    matrix = result.get('attention_matrix')
+    if matrix is None:
+        profile = result.get('attention_profile')
+        if profile is None:
+            return None
+        profile = np.asarray(profile, dtype=np.float32)
+        if profile.size == 0:
+            return None
+        return profile[np.newaxis, :]
+    return np.asarray(matrix, dtype=np.float32)
+
+
+def build_secondary_chart(chart_name: str, eeg: np.ndarray, mask: np.ndarray,
+                          words: list[str], result: dict, saliency: np.ndarray):
+    """Build exactly one secondary chart to keep the UI responsive."""
+    if chart_name == '🧠 EEG Feature Space':
+        return eeg_feature_space_plot(eeg, mask, words, samples_per_word=50)
+    if chart_name == '🔊 Spectrograms':
+        attention_profile = np.asarray(result.get('attention_profile', saliency), dtype=np.float32)
+        return eeg_spectrogram_plot(eeg, mask, attention_profile=attention_profile)
+    if chart_name == '🦋 Butterfly Plot':
+        return butterfly_plot(eeg, mask, title='Butterfly Plot — Selected View')
+    return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Core callback
 # ─────────────────────────────────────────────────────────────────────────────
 
-def on_select(sample_choice: str, version: str, mode: str):
+def on_select(sample_choice: str, version: str, mode: str, chart_name: str,
+              progress=gr.Progress(track_tqdm=False)):
     """Called every time a user picks a sample or changes settings."""
     idx = SAMPLE_LABELS.index(sample_choice)
     row = demo_df.iloc[idx]
@@ -170,12 +261,7 @@ def on_select(sample_choice: str, version: str, mode: str):
     eeg, mask = eeg_numpy(row)
     words     = str(row.get('input text', '')).split()
     task_gt   = 'NR' if str(row.get('task', 'task1')) != 'task3' else 'TSR'
-
-    # ── EEG plots ──
-    fig_butterfly = butterfly_plot(
-        eeg, mask,
-        title=f"Butterfly Plot — {row.get('subject', '?')} | {task_gt}")
-    fig_topo = topomap_grid(eeg, mask, words, samples_per_word=50, cols=5)
+    saliency  = compute_saliency_profile(eeg, mask)
 
     # ── Text & Stats ──
     raw_input = str(row.get('input text', ''))
@@ -184,10 +270,12 @@ def on_select(sample_choice: str, version: str, mode: str):
 
     # ── Get result (static or live) ──
     if mode == '⚡ Live Inference' and version in CKPT_MAP:
-        result = run_inference(idx, row, CKPT_MAP[version], version, DEVICE)
+        progress(0.02, desc="Thinking")
+        result = run_inference(idx, row, CKPT_MAP[version], version, DEVICE, progress=progress)
         gen_text = result['gen_text']
         status   = f"✅ {'From cache' if result.get('_from_cache') else 'Fresh inference'} — {version}"
     else:
+        progress(1.0, desc="Ready")
         # Static: use pre-stored gen text + pre-computed text metrics
         gen_text = str(row.get('gen text', '(Not precomputed — switch to Live)'))
         # Try to load per-sample cache written by create_demo_df.py
@@ -216,12 +304,15 @@ def on_select(sample_choice: str, version: str, mode: str):
             }
             status = "⚠️ Text metrics only (no model cache — run create_demo_df.py --checkpoint v1 v2)"
 
+    secondary_chart = build_secondary_chart(chart_name, eeg, mask, words, result, saliency)
+
     gen_metrics_df = render_generation_table(result['text_metrics'])
+    etes_df        = render_etes_table(result.get('etes_metrics', {}))
     cls_df         = render_cls_table(result)
 
-    return (fig_butterfly, fig_topo,
+    return (secondary_chart,
             gt_text, raw_input, gen_text,
-            gen_metrics_df, cls_df,
+            gen_metrics_df, etes_df, cls_df,
             status)
 
 
@@ -237,11 +328,11 @@ h1, h2, h3             { color: #a0c4ff !important; }
 """
 
 def build_ui():
-    with gr.Blocks(css=CSS, title="LEXI EEG-to-Text Demo") as demo:
+    with gr.Blocks(css=CSS, title="GRAPE-GLIM EEG-to-Text Demo") as demo:
 
         gr.Markdown("""
-# 🧠 LEXI - EEG-to-Text Generation
-**EEG→Text generation · Zero-shot classification · Topographic visualisation**
+# 🧠 GRAPE-GLIM - EEG-to-Text Generation
+**EEG→Text generation · Zero-shot classification · EEG feature space · spectrograms · butterfly plot**
 """)
 
         with gr.Row():
@@ -252,17 +343,17 @@ def build_ui():
                                      if CKPT_MAP else 'v1', scale=1)
             mode_dd    = gr.Dropdown(['📂 Static (pre-computed)', '⚡ Live Inference'],
                                      label="⚙️ Mode", value='📂 Static (pre-computed)', scale=1)
+            chart_dd   = gr.Radio(
+                ['🦋 Butterfly Plot','🧠 EEG Feature Space', '🔊 Spectrograms'],
+                label='🖼️ Chart', value='🦋 Butterfly Plot', scale=2
+            )
 
-        status_box = gr.Textbox(label="Status", interactive=False, max_lines=1, visible=False)
+        status_box = gr.Textbox(label="Status", interactive=False, max_lines=1, visible=True)
 
         # ── Row 1: EEG Plots ──
         with gr.Row():
             with gr.Column():
-                with gr.Tabs():
-                    with gr.Tab("🦋 Butterfly Plot"):
-                        butterfly_out = gr.Plot(label="All 128 channels (blue=left, red=right)")
-                    with gr.Tab("🗺️ Topographic Word Snapshots"):
-                        topo_out = gr.Plot(label="Spatial amplitude per word window")
+                chart_out = gr.Plot(label="Selected chart", elem_id="selected-chart")
 
         # ── Row 2: Text Information ──
         with gr.Row():
@@ -287,25 +378,32 @@ def build_ui():
                     interactive=False)
 
             with gr.Column():
+                gr.Markdown("### 🧠 ETES Metrics")
+                etes_table = gr.DataFrame(
+                    headers=['Metric', 'Score', 'Note'],
+                    interactive=False)
+
+            with gr.Column():
                 gr.Markdown("### 🎯 Classification Metrics")
                 cls_table = gr.DataFrame(
                     headers=['Task', 'Prediction', 'Confidence', 'All probs'],
                     interactive=False)
 
         # ── Trigger ──
-        inputs  = [sample_dd, version_dd, mode_dd]
-        outputs = [butterfly_out, topo_out,
+        inputs  = [sample_dd, version_dd, mode_dd, chart_dd]
+        outputs = [chart_out,
                    meta_box, input_box, gen_box,
-                   gen_table, cls_table, status_box]
+                   gen_table, etes_table, cls_table, status_box]
 
-        for trigger in [sample_dd, version_dd, mode_dd]:
+        for trigger in [sample_dd, version_dd, mode_dd, chart_dd]:
             trigger.change(fn=on_select, inputs=inputs, outputs=outputs)
 
         # Load first sample on startup
         demo.load(fn=on_select,
                   inputs=[gr.Textbox(value=SAMPLE_LABELS[0], visible=False),
                           gr.Textbox(value=list(CKPT_MAP.keys())[0] if CKPT_MAP else 'v1', visible=False),
-                          gr.Textbox(value='📂 Static (pre-computed)', visible=False)],
+                  gr.Textbox(value='📂 Static (pre-computed)', visible=False),
+              gr.Textbox(value='🦋 Butterfly Plot', visible=False)],
                   outputs=outputs)
 
     return demo
@@ -320,5 +418,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ui = build_ui()
+    ui.queue()
     ui.launch(share=args.share, server_port=args.port,
-              server_name='0.0.0.0', show_error=True)
+              server_name='localhost', show_error=True)
