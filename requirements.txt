@@ -60,6 +60,6 @@ ipywidgets>=8.0.0
 # =============================================================================
 # Optional: For accelerated training (uncomment if needed)
 # =============================================================================
-# bitsandbytes>=0.41.0  # For 8-bit quantization
-# flash-attn>=2.3.0     # For Flash Attention (requires CUDA)
-# xformers>=0.0.22      # For memory-efficient attention
+bitsandbytes>=0.41.0  # For 8-bit quantization
+flash-attn>=2.3.0     # For Flash Attention (requires CUDA)
+xformers>=0.0.22      # For memory-efficient attention
