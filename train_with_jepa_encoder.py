@@ -106,6 +106,11 @@ if os.path.exists(PRETRAINED_CKPT_PATH):
         print("❄️ Frozen pretrained encoder (in_blocks)")
     else:
         print("🔥 Pretrained encoder will be fine-tuned")
+    
+    print("=" * 60)
+    print("  📌 eeg_encoder.in_blocks = JEPA Pretrained Encoder")
+    print("  📌 eeg_encoder.out_blocks = Q-Merger (trained from scratch)")
+    print("=" * 60)
 else:
     print(f"⚠️ No pretrained checkpoint found at {PRETRAINED_CKPT_PATH}")
     print("   Training from scratch (no pretraining)")
