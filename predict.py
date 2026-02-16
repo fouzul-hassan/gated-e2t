@@ -94,7 +94,16 @@ def load_llm_pipeline(device='cuda:0'):
 
 
 def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
-    """Compute LLM-based classification accuracy."""
+    """
+    Compute LLM-based classification accuracy.
+    Matches the notebook approaches exactly:
+    - corpus: integer labels, max_new_tokens=4
+    - relation: top-3 text labels, max_new_tokens=16
+    - sentiment: text labels, max_new_tokens=8
+    """
+    # Use generated text for evaluation
+    input_sentences = [r['gen_text'] for r in results]
+    
     if task_type == 'corpus':
         instructions = {
             "role": "system", 
@@ -104,28 +113,30 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
                 " Please just output the integer label."
             )
         }
+        max_new_tokens = 4
     elif task_type == 'relation':
         instructions = {
             "role": "system", 
             "content": (
-                "You task is to classify the relation type in the following sentence."
-                " Labels: 0='awarding', 1='education', 2='employment', 3='foundation',"
-                " 4='job title', 5='nationality', 6='political affiliation', 7='visit', 8='marriage'."
-                " Please just output the integer label."
+                "You task is relation extraction. Please choose the top-3 from the below 9 possible labels:\n"
+                " awarding, education, employment, foundation, job title, nationality,"
+                " political affiliation, visit, and marriage.\n"
+                " Please just output the three most likely labels in descending order of probability,"
+                " and separate them by commas. Do not output any other words!"
             )
         }
+        max_new_tokens = 16
     elif task_type == 'sentiment':
         instructions = {
             "role": "system", 
             "content": (
-                "You task is to classify the sentiment of the following sentence."
-                " Labels: 0='negative', 1='neutral', 2='positive'."
-                " Please just output the integer label."
+                "You task is sentiment classification. Please pick the most likely label from:\n"
+                " negative, neutral and positive.\n"
+                " Please just output your predicted label do not output any other words!"
             )
         }
+        max_new_tokens = 8
     
-    # Use generated text for evaluation
-    input_sentences = [r['gen_text'] for r in results]
     messages = [[instructions, {"role": "user", "content": sen}] for sen in input_sentences]
     inputs = pipe.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     
@@ -141,35 +152,62 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
         outputs = pipe(
             inputs, 
             batch_size=16, 
-            max_new_tokens=4,
+            max_new_tokens=max_new_tokens,
             eos_token_id=terminators,
             do_sample=True,
             num_beams=2,
             pad_token_id=pipe.tokenizer.eos_token_id,
         )
     
-    # Calculate accuracy
-    predictions = []
-    for i, output in enumerate(outputs):
-        try:
-            pred_text = output[0]['generated_text'][len(inputs[i]):]
-            pred = int(pred_text.strip())
-            predictions.append(pred)
-        except:
-            predictions.append(-1)
+    if task_type == 'corpus':
+        # Corpus: integer label matching (notebook approach)
+        n_correct = 0
+        for i in range(len(outputs)):
+            try:
+                pred = int(outputs[i][0]['generated_text'][len(inputs[i]):])
+                if pred == labels[i]:
+                    n_correct += 1
+            except:
+                pass
+        llm_acc_top1 = n_correct / len(labels)
+        return llm_acc_top1, llm_acc_top1
     
-    # Top-1 accuracy
-    n_correct = sum(1 for i, p in enumerate(predictions) if p == labels[i])
-    llm_acc_top1 = n_correct / len(labels)
+    elif task_type == 'relation':
+        # Relation: top-3 text label matching (notebook approach)
+        all_relations = ['awarding', 'education', 'employment', 'foundation', 
+                         'job title', 'nationality', 'political affiliation', 'visit', 'marriage']
+        label_to_str = {i: r for i, r in enumerate(all_relations)}
+        
+        n_correct_top1 = 0
+        n_correct_top3 = 0
+        for i in range(len(outputs)):
+            pred_text = outputs[i][0]['generated_text'][len(inputs[i]):].strip()
+            pred_labels = [p.strip().lower() for p in pred_text.split(',')]
+            true_label = label_to_str.get(labels[i], '')
+            
+            if len(pred_labels) >= 1 and pred_labels[0] == true_label:
+                n_correct_top1 += 1
+            if true_label in pred_labels[:3]:
+                n_correct_top3 += 1
+        
+        llm_acc_top1 = n_correct_top1 / len(labels)
+        llm_acc_top3 = n_correct_top3 / len(labels)
+        return llm_acc_top1, llm_acc_top3
     
-    # For multi-class, also compute top-3 (if applicable)
-    if num_classes > 3:
-        # Top-3 would need probability outputs from LLM, so we approximate
-        llm_acc_top3 = llm_acc_top1  # Placeholder - LLM only gives single prediction
-    else:
-        llm_acc_top3 = llm_acc_top1
-    
-    return llm_acc_top1, llm_acc_top3
+    elif task_type == 'sentiment':
+        # Sentiment: text label matching (notebook approach)
+        all_sentiments = ['negative', 'neutral', 'positive']
+        label_to_str = {i: s for i, s in enumerate(all_sentiments)}
+        
+        n_correct = 0
+        for i in range(len(outputs)):
+            pred_text = outputs[i][0]['generated_text'][len(inputs[i]):].strip().lower()
+            true_label = label_to_str.get(labels[i], '')
+            if pred_text == true_label:
+                n_correct += 1
+        
+        llm_acc_top1 = n_correct / len(labels)
+        return llm_acc_top1, llm_acc_top1
 
 
 def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
@@ -309,14 +347,14 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     if all_probs:
         probs = torch.cat(all_probs, dim=0)
         labels_tensor = torch.tensor(all_labels, device=probs.device)
-        clip_acc1 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=1, average='micro')
-        clip_acc3 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=3, average='micro')
+        clip_acc1 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
+        clip_acc3 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
         
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="To English: <MASK>.")
-        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=1, average='micro')
-        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=1, average='micro')
+        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
     else:
         clip_acc1, clip_acc3, clip_acc_raw, clip_acc_gen = 0, 0, 0, 0
     
@@ -366,7 +404,7 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     console.print("SENTIMENT CLASSIFICATION", style="bold blue")
     console.print("="*80 + "\n", style="bold blue")
     
-    prefix = "Sentiment classification: "
+    prefix = "Sentiment: "
     template = "It is <MASK>."
     # ZuCo Task 1 (Sentiment) typically has these 3 classes
     sentiment_types = ['negative', 'neutral', 'positive']
@@ -413,13 +451,13 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     if all_probs:
         probs = torch.cat(all_probs, dim=0)
         labels_tensor = torch.tensor(all_labels, device=probs.device)
-        clip_acc1 = multiclass_accuracy(probs, labels_tensor, num_classes=len(sentiment_types), top_k=1, average='micro')
+        clip_acc1 = multiclass_accuracy(probs, labels_tensor, num_classes=len(sentiment_types), top_k=1, ignore_index=-1, average='micro')
         
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="Sentiment classification: <MASK>.")
-        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(sentiment_types), top_k=1, average='micro')
-        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(sentiment_types), top_k=1, average='micro')
+        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(sentiment_types), top_k=1, ignore_index=-1, average='micro')
+        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(sentiment_types), top_k=1, ignore_index=-1, average='micro')
     else:
         clip_acc1, clip_acc_raw, clip_acc_gen = 0, 0, 0
     
@@ -451,6 +489,101 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
         'llm_acc_top1': llm_acc1,
         'llm_acc_top3': llm_acc3,
     }
+
+
+def save_results_to_txt(all_results, output_dir, checkpoint_path):
+    """Save each task's results to a separate text file."""
+    from datetime import datetime
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    for task, data in all_results.items():
+        txt_path = os.path.join(output_dir, f'{task}_results.txt')
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write(f"{'='*80}\n")
+            f.write(f"  {task.upper()} CLASSIFICATION RESULTS\n")
+            f.write(f"{'='*80}\n\n")
+            f.write(f"Timestamp:  {timestamp}\n")
+            f.write(f"Checkpoint: {checkpoint_path}\n\n")
+            
+            # --- Summary Metrics ---
+            f.write(f"{'-'*40}\n")
+            f.write(f"  Summary Metrics\n")
+            f.write(f"{'-'*40}\n")
+            
+            if task == 'corpus':
+                f.write(f"  EEG Accuracy:        {data.get('clip_acc', 0):.4f}\n")
+                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
+                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
+                if data.get('llm_acc') is not None:
+                    f.write(f"  LLM-Pred Acc:        {data['llm_acc']:.4f}\n")
+            
+            elif task == 'relation':
+                f.write(f"  EEG Acc (Top-1):     {data.get('clip_acc1', 0):.4f}\n")
+                f.write(f"  EEG Acc (Top-3):     {data.get('clip_acc3', 0):.4f}\n")
+                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
+                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
+                if data.get('llm_acc_top1') is not None:
+                    f.write(f"  LLM-Pred Acc (Top1): {data['llm_acc_top1']:.4f}\n")
+                    f.write(f"  LLM-Pred Acc (Top3): {data['llm_acc_top3']:.4f}\n")
+            
+            elif task == 'sentiment':
+                f.write(f"  EEG Accuracy:        {data.get('clip_acc', 0):.4f}\n")
+                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
+                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
+                if data.get('llm_acc_top1') is not None:
+                    f.write(f"  LLM-Pred Acc (Top1): {data['llm_acc_top1']:.4f}\n")
+                    f.write(f"  LLM-Pred Acc (Top3): {data['llm_acc_top3']:.4f}\n")
+            
+            f.write(f"\n")
+            
+            # --- Per-Sample Predictions ---
+            results = data.get('results', [])
+            if results:
+                f.write(f"{'-'*40}\n")
+                f.write(f"  Per-Sample Predictions ({len(results)} samples)\n")
+                f.write(f"{'-'*40}\n\n")
+                
+                if task == 'corpus':
+                    label_names = ['movie review', 'personal biography']
+                    for i, r in enumerate(results):
+                        pred_idx = r.get('pred', -1)
+                        label_idx = r.get('label', -1)
+                        pred_name = label_names[pred_idx] if 0 <= pred_idx < len(label_names) else '?'
+                        label_name = label_names[label_idx] if 0 <= label_idx < len(label_names) else '?'
+                        correct = '✓' if pred_idx == label_idx else '✗'
+                        f.write(f"[{i+1:4d}] {correct}  Label: {label_name:<20s}  Pred: {pred_name:<20s}\n")
+                        f.write(f"        Raw:  {r.get('raw_input_text', '')[:80]}\n")
+                        f.write(f"        Gen:  {r.get('gen_text', '')[:80]}\n\n")
+                
+                elif task == 'relation':
+                    relation_types = ['awarding', 'education', 'employment', 'foundation', 
+                                      'job title', 'nationality', 'political affiliation', 'visit', 'marriage']
+                    for i, r in enumerate(results):
+                        pred_idx = r.get('pred', -1)
+                        label_idx = r.get('label_idx', -1)
+                        pred_name = relation_types[pred_idx] if 0 <= pred_idx < len(relation_types) else '?'
+                        label_name = r.get('relation_label', '?')
+                        correct = '✓' if pred_idx == label_idx else ('✗' if label_idx >= 0 else '-')
+                        f.write(f"[{i+1:4d}] {correct}  Label: {str(label_name):<25s}  Pred: {pred_name:<25s}\n")
+                        f.write(f"        Raw:  {r.get('raw_input_text', '')[:80]}\n")
+                        f.write(f"        Gen:  {r.get('gen_text', '')[:80]}\n\n")
+                
+                elif task == 'sentiment':
+                    sentiment_types = ['negative', 'neutral', 'positive']
+                    for i, r in enumerate(results):
+                        pred_idx = r.get('pred', -1)
+                        label_idx = r.get('label_idx', -1)
+                        pred_name = sentiment_types[pred_idx] if 0 <= pred_idx < len(sentiment_types) else '?'
+                        label_name = r.get('sentiment_label', '?')
+                        correct = '✓' if pred_idx == label_idx else ('✗' if label_idx >= 0 else '-')
+                        f.write(f"[{i+1:4d}] {correct}  Label: {str(label_name):<12s}  Pred: {pred_name:<12s}\n")
+                        f.write(f"        Raw:  {r.get('raw_input_text', '')[:80]}\n")
+                        f.write(f"        Gen:  {r.get('gen_text', '')[:80]}\n\n")
+            
+            f.write(f"\n{'='*80}\n")
+        
+        print(f"Saved {task} results to {txt_path}")
 
 
 def main():
@@ -518,13 +651,16 @@ def main():
     
     console.print(summary_table)
     
-    # Save results
+    # Always save results to text files
+    save_results_to_txt(all_results, args.output_dir, args.checkpoint)
+    
+    # Optionally save to pickle
     if args.save_results:
         os.makedirs(args.output_dir, exist_ok=True)
         for task, data in all_results.items():
             output_path = os.path.join(args.output_dir, f'{task}_predictions.pkl')
             pd.to_pickle(data['results'], output_path)
-            print(f"Saved {task} results to {output_path}")
+            print(f"Saved {task} pickle to {output_path}")
     
     return all_results
 

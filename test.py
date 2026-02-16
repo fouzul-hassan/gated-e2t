@@ -41,7 +41,7 @@ dm = GLIMDataModule(data_path = './data/tmp/zuco_eeg_label_8variants.df',
                     )
 
 model = GLIM.load_from_checkpoint(
-    "checkpoints/glim-zuco-epoch=199-step=49600.ckpt",
+    "./runs/dev-dist/wandb/latest-run/files-checkpoints/epoch=199-step=397600.ckpt",
     map_location = f"cuda:{devices[0]}",
     strict = False,
     use_etes_eval = True,  # Enable ETES evaluation
