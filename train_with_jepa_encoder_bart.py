@@ -54,7 +54,7 @@ callbacks = [
 trainer = L.Trainer(accelerator='gpu',
                     devices=devices,
                     logger=logger,
-                    max_epochs=200,
+                    max_epochs=100,
                     precision='bf16-mixed',
                     enable_checkpointing=True,
                     callbacks=callbacks,
