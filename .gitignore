@@ -10,6 +10,9 @@ data/tmp/zuco_eeg_label_8variants.df
 
 *.zip
 
+eda_figures/*.png
+data/tmp/note-on-preprocessing.md
+
 glim-trained-checkpoint/*.ckpt
 
 pretrain_plots/*.png

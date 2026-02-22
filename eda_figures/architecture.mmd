@@ -1,0 +1,161 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#E3F2FD', 'primaryBorderColor': '#1565C0', 'lineColor': '#37474F', 'fontSize': '14px'}}}%%
+
+flowchart TD
+
+%% ============================================================================================
+%% STAGE 1: SIGNAL-JEPA PRETRAINING
+%% ============================================================================================
+
+subgraph STAGE1["<b>Stage 1: Signal-JEPA Pretraining</b><br/><i>Self-supervised representation learning — ~3.5h on 1 GPU</i>"]
+    direction TB
+
+    EEG_RAW["<b>Raw EEG Input</b><br/>(batch, 1280, 128)<br/>1280 time points × 128 channels<br/>Voltage values in μV"]
+
+    PATCH["<b>Patch Embedding</b><br/>Conv1d(128, 128, kernel=8, stride=8)<br/>+ 1D Sinusoidal Positional Encoding<br/>patch_size=8 → <b>160 patches</b><br/>(batch, 160, 128)"]
+
+    SSP["<b>SSP Masking</b><br/><i>Semantic Subsequence Preserving</i><br/>Selects contiguous temporal chunks<br/>mask_ratio = 50%<br/>→ 80 visible + 80 masked"]
+
+    CTX_ENC["<b>Context Encoder</b><br/><b>6× EncoderBlock</b><br/>128 dim, 8 heads, MLP ratio 4<br/>Self-Attention + LayerNorm + MLP<br/>Gated Attention (optional)<br/><br/>Visible patches only<br/>(batch, 80, 128)"]
+
+    TGT_ENC["<b>Target Encoder</b><br/><b>6× EncoderBlock (EMA copy)</b><br/>Momentum τ = 0.99<br/>⛔ No gradients (stop-grad)<br/><br/>Masked patches only<br/>(batch, 80, 128)"]
+
+    PREDICTOR["<b>Predictor</b><br/><b>2× CrossAttnPredictorBlock</b><br/>Cross-Attention:<br/>Q = mask tokens<br/>K, V = context output<br/>+ LayerNorm + MLP<br/><br/>(batch, 80, 128)"]
+
+    VICREG["<b>VICReg Loss</b><br/><b>ℒ = α·ℒ_align + β·ℒ_var + γ·ℒ_cov</b><br/><br/>ℒ_align: MSE(predicted, target)<br/>ℒ_var: variance ≥ 1.0<br/>ℒ_cov: off-diagonal → 0<br/><br/><i>Prevents representation collapse</i>"]
+
+    EEG_RAW --> PATCH
+    PATCH --> SSP
+    SSP -->|"visible<br/>patches"| CTX_ENC
+    SSP -->|"masked<br/>patches"| TGT_ENC
+    CTX_ENC -.->|"EMA update<br/>(τ=0.99)"| TGT_ENC
+    CTX_ENC -->|"context<br/>representations"| PREDICTOR
+    PREDICTOR -->|"predicted repr."| VICREG
+    TGT_ENC -->|"target repr."| VICREG
+end
+
+%% ============================================================================================
+%% WEIGHT TRANSFER
+%% ============================================================================================
+
+TRANSFER["<b>⬇ Weight Transfer</b><br/>load_pretrained_encoder()<br/>Context Encoder → EEG Encoder in_blocks<br/>Shape-matched key-by-key loading<br/><b>Only the 6 EncoderBlocks transferred</b>"]
+
+STAGE1 ==>|"Pretrained<br/>weights"| TRANSFER
+
+%% ============================================================================================
+%% STAGE 2: EEG-TO-TEXT FINE-TUNING
+%% ============================================================================================
+
+subgraph STAGE2["<b>Stage 2: EEG-to-Text Fine-tuning</b><br/><i>200 epochs, bf16-mixed precision</i>"]
+    direction TB
+
+    %% ── INPUTS ──
+    EEG_IN["<b>Raw EEG Input</b><br/>(n, 1280, 128)<br/>time × channels"]
+    TEXT_IN["<b>Input Text</b><br/>'To English: &lt;sentence&gt;'<br/>Tokenized, max_len = 96"]
+    TGT_IN["<b>Target Text</b><br/>Ground truth sentence<br/>Tokenized, max_len = 64<br/>8 text variants"]
+
+    P_EMBED["<b>Prompt Embedder</b><br/><b>3 Learned Embedding Tables</b><br/><br/>Task: &lt;NR&gt; / &lt;TSR&gt; (3 tokens)<br/>Dataset: ZuCo1/ZuCo2 (3 tokens)<br/>Subject: 31 subject IDs<br/><br/>Dropout: task=0%, dataset=100%, subject=100%<br/>→ (n, 128)"]
+
+    %% ── EEG ENCODER ──
+    subgraph EEG_ENCODER["<b>EEG Encoder</b>"]
+        direction TB
+
+        POS_EMB["<b>+ Sinusoidal Pos. Encoding</b><br/>(1280, 128)<br/>(n, 1280, 128)"]
+
+        BACKBONE["<b>Backbone: 6× EncoderBlock</b><br/>★ JEPA Pretrained Weights<br/><br/>Each block:<br/>├─ Temporal Modulate (prompt p)<br/>├─ adaLN (shift, scale, gate)<br/>├─ <b>Gated Self-Attention</b> (8 heads)<br/>│ &nbsp; gate = σ(W_g·Q) ⊙ Attn(Q,K,V)<br/>├─ LayerNorm<br/>└─ MLP (ratio=4, GELU)<br/><br/>Mask-aware: ignores padded steps<br/>Input/Output: (n, 1280, 128)"]
+
+        PROJ["<b>Projection + LayerNorm</b><br/>Linear(128 → 256)<br/>(n, 1280, 128) → (n, 1280, 256)"]
+
+        QUERIES["<b>Learned Queries</b><br/>nn.Parameter<br/>92 tokens × 256 dim"]
+
+        Q_MERGER["<b>Q-Merger: 6× DecoderBlock</b><br/><br/>Each block:<br/>├─ <b>Gated Self-Attention</b> (causal)<br/>├─ <b>Cross-Attention</b><br/>│ &nbsp; Q = learned queries<br/>│ &nbsp; K, V = encoder output (1280)<br/>│ &nbsp; <i>Compresses 1280 → 96 tokens</i><br/>├─ LayerNorm<br/>└─ MLP (ratio=4, GELU)<br/><br/>+ 4 prompt tokens → <b>96 total</b><br/>Output: (n, 96, 256)"]
+
+        POS_EMB --> BACKBONE
+        BACKBONE --> PROJ
+        PROJ -->|"EEG hidden<br/>states (K,V)"| Q_MERGER
+        QUERIES -->|"queries (Q)"| Q_MERGER
+    end
+
+    %% ── TEXT ENCODER ──
+    TEXT_ENC["<b>Text Encoder</b><br/><b>Flan-T5-Large Encoder</b><br/>⛔ Frozen (no gradients)<br/><br/>(n, 96, 1024)"]
+
+    %% ── ALIGNER ──
+    subgraph ALIGNER["<b>Cross-Modal Aligner</b>"]
+        direction TB
+
+        ALIGN_EEG["<b>EEG Embedding</b><br/>Linear(256 → 1024) + LN<br/>(n, 96, 256) → (n, 96, 1024)<br/>Pool → (n, 1024)"]
+
+        ALIGN_TEXT["<b>Text Embedding</b><br/>Linear(1024 → 1024)<br/>(n, 96, 1024)<br/>Pool → (n, 1024)"]
+
+        CLIP_LOSS["<b>CLIP-style Contrastive Loss</b><br/><b>ℒ_CLS = CE(cosine_sim / τ)</b><br/>sim_matrix: (n, n)<br/>EEG ↔ Text alignment"]
+
+        ALIGN_EEG -->|"EEG emb"| CLIP_LOSS
+        ALIGN_TEXT -->|"text emb"| CLIP_LOSS
+    end
+
+    %% ── TEXT DECODER ──
+    TEXT_DEC["<b>Text Decoder</b><br/><b>Flan-T5-Large Decoder</b><br/>⛔ Frozen (no gradients)<br/><br/>Autoregressive generation<br/>Cross-attention to EEG embeddings<br/>(n, 96, 1024) → (n, 64, vocab)<br/><br/>Beam search (k=2)"]
+
+    LM_LOSS["<b>Language Modeling Loss</b><br/><b>ℒ_LM = CE(logits, target)</b><br/>Teacher-forced, pad=-100"]
+
+    TOTAL_LOSS["<b>Total Training Loss</b><br/><b>ℒ = ℒ_LM + 0.5·ℒ_CLS</b><br/><br/>Optimizer: AdamW (lr=1e-4)"]
+
+    OUTPUT["<b>Generated Text Output</b><br/>'The movie presents a compelling...'<br/><br/>Metrics: BLEU-1/2/3/4, ROUGE-1/2/L"]
+
+    %% ══════════ CONNECTIONS ══════════
+    EEG_IN --> POS_EMB
+    P_EMBED -->|"prompt<br/>conditioning"| BACKBONE
+    TEXT_IN --> TEXT_ENC
+
+    Q_MERGER -->|"(n, 96, 256)"| ALIGN_EEG
+    TEXT_ENC -->|"(n, 96, 1024)"| ALIGN_TEXT
+
+    ALIGN_EEG -->|"EEG sequence<br/>embeddings<br/>(n, 96, 1024)"| TEXT_DEC
+    TGT_IN -->|"target<br/>token IDs"| TEXT_DEC
+
+    TEXT_DEC --> LM_LOSS
+    CLIP_LOSS --> TOTAL_LOSS
+    LM_LOSS --> TOTAL_LOSS
+
+    TEXT_DEC -->|"beam search<br/>decoding"| OUTPUT
+end
+
+TRANSFER ==>|"6× EncoderBlock<br/>weights"| EEG_ENCODER
+
+%% ============================================================================================
+%% STYLES
+%% ============================================================================================
+
+style STAGE1 fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
+style STAGE2 fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style EEG_ENCODER fill:#C8E6C9,stroke:#2E7D32,stroke-width:2px
+style ALIGNER fill:#B2EBF2,stroke:#00838F,stroke-width:2px
+
+style EEG_RAW fill:#BBDEFB,stroke:#1565C0
+style EEG_IN fill:#BBDEFB,stroke:#1565C0
+style PATCH fill:#90CAF9,stroke:#1565C0
+style SSP fill:#FFF9C4,stroke:#F9A825
+style CTX_ENC fill:#A5D6A7,stroke:#2E7D32,stroke-width:2px
+style TGT_ENC fill:#DCEDC8,stroke:#558B2F,stroke-dasharray:5 5
+style PREDICTOR fill:#FFF8E1,stroke:#F57F17,stroke-width:2px
+style VICREG fill:#FFCDD2,stroke:#C62828
+style TRANSFER fill:#FFE0B2,stroke:#E65100,stroke-width:2px
+
+style POS_EMB fill:#E8F5E9,stroke:#2E7D32
+style BACKBONE fill:#A5D6A7,stroke:#2E7D32,stroke-width:2px
+style PROJ fill:#81C784,stroke:#2E7D32
+style QUERIES fill:#CE93D8,stroke:#6A1B9A
+style Q_MERGER fill:#B39DDB,stroke:#6A1B9A,stroke-width:2px
+style P_EMBED fill:#D1C4E9,stroke:#4527A0
+
+style TEXT_IN fill:#F8BBD0,stroke:#AD1457
+style TGT_IN fill:#F8BBD0,stroke:#AD1457
+style TEXT_ENC fill:#CFD8DC,stroke:#78909C,stroke-dasharray:5 5
+style TEXT_DEC fill:#CFD8DC,stroke:#78909C,stroke-dasharray:5 5
+
+style ALIGN_EEG fill:#80DEEA,stroke:#00838F
+style ALIGN_TEXT fill:#80DEEA,stroke:#00838F
+style CLIP_LOSS fill:#B2EBF2,stroke:#00838F
+
+style LM_LOSS fill:#FFCDD2,stroke:#C62828
+style TOTAL_LOSS fill:#EF9A9A,stroke:#C62828,stroke-width:2px
+style OUTPUT fill:#F48FB1,stroke:#AD1457
