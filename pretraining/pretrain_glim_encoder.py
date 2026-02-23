@@ -128,7 +128,7 @@ class GLIMEncoderPretrainer(nn.Module):
         """
         B, T, C = x.shape
         # Reshape to (B, num_patches, patch_size * C)
-        x = x.view(B, self.num_patches, self.patch_size * C)
+        x = x.reshape(B, self.num_patches, self.patch_size * C)
         # Project to embedding dimension
         patches = self.patch_embed(x)  # (B, num_patches, emb_size)
         return patches
