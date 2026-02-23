@@ -252,6 +252,9 @@ class GLIMEncoderPretrainer(nn.Module):
         Returns:
             representations: (B, emb_size) pooled features
         """
+        # Data arrives as (B, C, T) = (B, 128, 1280), patchify expects (B, T, C)
+        if x.shape[1] == self.in_dim and x.shape[2] == self.in_len:
+            x = x.transpose(1, 2).contiguous()
         patches = self.patchify(x)
         patches = patches + self.pos_embed
         out = self.encode_context(patches)
