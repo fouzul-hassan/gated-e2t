@@ -162,6 +162,10 @@ class GLIMEncoderPretrainer(nn.Module):
             rep_context: full context encoder output (for monitoring)
             rep_target: full target encoder output (for monitoring)
         """
+        # Data arrives as (B, C, T) = (B, 128, 1280), patchify expects (B, T, C)
+        if x.shape[1] == self.in_dim and x.shape[2] == self.in_len:
+            x = x.transpose(1, 2)  # (B, C, T) → (B, T, C)
+        
         B = x.shape[0]
         
         # Patchify and add positional encoding
