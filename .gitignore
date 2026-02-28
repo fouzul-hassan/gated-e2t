@@ -19,3 +19,5 @@ pretrain_plots/*.png
 pretrain_plots/*.md
 
 e2t-jepapretrain.ipynb
+
+pretraining/Results/GLIM_Pretrain5/*pth
