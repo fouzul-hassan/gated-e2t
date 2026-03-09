@@ -20,4 +20,13 @@ pretrain_plots/*.md
 
 e2t-jepapretrain.ipynb
 
-pretraining/Results/GLIM_Pretrain5/*pth
+# pretraining/Results/GLIM_Pretrain5/*pth
+pretraining/pretrain_plots_baseline/*.png
+pretraining/pretrain_plots_baseline/*.md
+
+
+pretraining/pretrain_plots_pretrain5/*.png
+pretraining/pretrain_plots_pretrain5/*.md
+
+results/eeg-to-text/*.md
+results/eeg-to-text/*.json
