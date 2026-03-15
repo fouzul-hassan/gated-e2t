@@ -11,7 +11,7 @@ from data.datamodule import GLIMDataModule
 
 warnings.filterwarnings("ignore", ".*when logging on epoch level in distributed.*")
 # set logger
-group_name = 'dev-dist'
+group_name = 'dev-dist-t5small'
 log_dir = './runs/' + group_name
 os.makedirs(log_dir, exist_ok=True)
 
@@ -64,8 +64,8 @@ model = GLIM(input_eeg_len = 1280,
              tgt_text_len = 64,
              input_dim = 128,
              hidden_dim = 256,
-             embed_dim = 1024,
-             text_model_id = "google/flan-t5-large",
+             embed_dim = 512,
+             text_model_id = "google/flan-t5-small",
              prompt_nums = (3, 3, 31),
              prompt_dropout_probs = (0.0, 1.0, 1.0),
              evaluate_prompt_embed = 'src',
@@ -106,15 +106,9 @@ if os.path.exists(PRETRAINED_CKPT_PATH):
         print("❄️ Frozen pretrained encoder (in_blocks)")
     else:
         print("🔥 Pretrained encoder will be fine-tuned")
-    
-    print("=" * 60)
-    print("  📌 eeg_encoder.in_blocks = JEPA Pretrained Encoder")
-    print("  📌 eeg_encoder.out_blocks = Q-Merger (trained from scratch)")
-    print("=" * 60)
 else:
     print(f"⚠️ No pretrained checkpoint found at {PRETRAINED_CKPT_PATH}")
     print("   Training from scratch (no pretraining)")
 # =========================================
 
 trainer.fit(model, datamodule=dm)
-
