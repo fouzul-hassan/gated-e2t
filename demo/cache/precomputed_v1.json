@@ -1,0 +1,682 @@
+{
+  "0": {
+    "gen_text": "The movie is extremely bad from start to finish.",
+    "sentiment_probs": [
+      0.34575021266937256,
+      0.3240102529525757,
+      0.33023950457572937
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11381180584430695,
+      0.10951857268810272,
+      0.10025481879711151,
+      0.09841178357601166,
+      0.12841585278511047,
+      0.12779034674167633,
+      0.08550163358449936,
+      0.12741650640964508,
+      0.1088787391781807
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.621540904045105,
+      0.37845906615257263
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.3947986960411072,
+      0.6052013039588928
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.3333333134651184,
+      "bleu1_raw": 0.2222222089767456,
+      "bleu2_mtv": 0.20412413775920868,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.31578946113586426,
+      "rouge1_fmeasure_raw": 0.21052631735801697,
+      "rouge1_precision_mtv": 0.3333333432674408,
+      "rouge1_precision_raw": 0.2222222238779068,
+      "rouge1_recall_mtv": 0.30000001192092896,
+      "rouge1_recall_raw": 0.20000000298023224,
+      "wer": 0.8888888955116272
+    }
+  },
+  "1": {
+    "gen_text": "This movie is as bad as Battlefield Earth and Showgirls.",
+    "sentiment_probs": [
+      0.3178620934486389,
+      0.34706366062164307,
+      0.33507421612739563
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.10010445863008499,
+      0.09641063958406448,
+      0.10892796516418457,
+      0.10713452845811844,
+      0.12586604058742523,
+      0.11858710646629333,
+      0.11516327410936356,
+      0.0999579206109047,
+      0.12784813344478607
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.40544870495796204,
+      0.5945512652397156
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.3883860111236572,
+      0.6116139888763428
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.24561919271945953,
+      "bleu1_raw": 0.0,
+      "bleu2_mtv": 0.14947909116744995,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.23999999463558197,
+      "rouge1_fmeasure_raw": 0.0,
+      "rouge1_precision_mtv": 0.30000001192092896,
+      "rouge1_precision_raw": 0.0,
+      "rouge1_recall_mtv": 0.20000000298023224,
+      "rouge1_recall_raw": 0.0,
+      "wer": 1.0
+    }
+  },
+  "2": {
+    "gen_text": "It's a sweet, sweet, sweet story about a mother's love for her daughter, and a mother's love for her daughter, and a mother's love for her daughter.",
+    "sentiment_probs": [
+      0.3163719177246094,
+      0.3437959849834442,
+      0.3398320972919464
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11521487683057785,
+      0.11771698296070099,
+      0.09792494028806686,
+      0.10983148962259293,
+      0.10212457925081253,
+      0.08769366890192032,
+      0.11702924966812134,
+      0.10823436826467514,
+      0.14422985911369324
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5254905819892883,
+      0.47450941801071167
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4491509795188904,
+      0.5508489608764648
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.2063561975955963,
+      "bleu1_raw": 0.12774862349033356,
+      "bleu2_mtv": 0.08584938198328018,
+      "bleu2_raw": 0.0650910958647728,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.190476194024086,
+      "rouge1_fmeasure_raw": 0.190476194024086,
+      "rouge1_precision_mtv": 0.19354838132858276,
+      "rouge1_precision_raw": 0.19354838132858276,
+      "rouge1_recall_mtv": 0.1875,
+      "rouge1_recall_raw": 0.1875,
+      "wer": 0.9354838728904724
+    }
+  },
+  "3": {
+    "gen_text": "John Adams graduated from Harvard University in 1755 and was elected to Phi Beta Kappa.",
+    "sentiment_probs": [
+      0.3686966896057129,
+      0.2962561249732971,
+      0.3350471556186676
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11498311161994934,
+      0.09970413893461227,
+      0.10159618407487869,
+      0.1015218049287796,
+      0.09748965501785278,
+      0.11565881967544556,
+      0.1338394284248352,
+      0.12056011706590652,
+      0.11464673280715942
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.43950676918029785,
+      0.5604932308197021
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4529593586921692,
+      0.5470406413078308
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.06666666269302368,
+      "bleu1_raw": 0.06666666269302368,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.07999999821186066,
+      "rouge1_fmeasure_raw": 0.07407407462596893,
+      "rouge1_precision_mtv": 0.06666667014360428,
+      "rouge1_precision_raw": 0.06666667014360428,
+      "rouge1_recall_mtv": 0.10000000149011612,
+      "rouge1_recall_raw": 0.0833333358168602,
+      "wer": 1.25
+    }
+  },
+  "4": {
+    "gen_text": "His family name was changed from Levy when he was a child.",
+    "sentiment_probs": [
+      0.35157573223114014,
+      0.2906138598918915,
+      0.3578104078769684
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11753210425376892,
+      0.10416581481695175,
+      0.08915214985609055,
+      0.11239662021398544,
+      0.10416581481695175,
+      0.11713108420372009,
+      0.11570996046066284,
+      0.1329214721918106,
+      0.10682496428489685
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.552705705165863,
+      0.44729432463645935
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4717099368572235,
+      0.5282900333404541
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.15334071218967438,
+      "bleu1_raw": 0.042784757912158966,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.1818181872367859,
+      "rouge1_fmeasure_raw": 0.125,
+      "rouge1_precision_mtv": 0.25,
+      "rouge1_precision_raw": 0.1666666716337204,
+      "rouge1_recall_mtv": 0.1428571492433548,
+      "rouge1_recall_raw": 0.10000000149011612,
+      "wer": 1.0
+    }
+  },
+  "5": {
+    "gen_text": "He was elected the Natrona County High School senior class president, represented the school at Boys State, and played halfback on the football team.",
+    "sentiment_probs": [
+      0.2856065630912781,
+      0.3540574014186859,
+      0.3603360652923584
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.10822667181491852,
+      0.0985415056347847,
+      0.09815733134746552,
+      0.1342962384223938,
+      0.12827157974243164,
+      0.10087834298610687,
+      0.100093312561512,
+      0.100093312561512,
+      0.13144174218177795
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5816595554351807,
+      0.41834044456481934
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4489094018936157,
+      0.5510905385017395
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.0833333283662796,
+      "bleu1_raw": 0.0833333283662796,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.125,
+      "rouge1_fmeasure_raw": 0.12121212482452393,
+      "rouge1_precision_mtv": 0.0833333358168602,
+      "rouge1_precision_raw": 0.0833333358168602,
+      "rouge1_recall_mtv": 0.25,
+      "rouge1_recall_raw": 0.2222222238779068,
+      "wer": 2.444444417953491
+    }
+  },
+  "6": {
+    "gen_text": "He wrote his first novel, The Town and the City.",
+    "sentiment_probs": [
+      0.37000229954719543,
+      0.30506229400634766,
+      0.3249354362487793
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.13847105205059052,
+      0.10911256819963455,
+      0.09470611065626144,
+      0.10953962057828903,
+      0.09369420260190964,
+      0.09385446459054947,
+      0.10106055438518524,
+      0.15119220316410065,
+      0.10836922377347946
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5758563876152039,
+      0.42414364218711853
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4504934549331665,
+      0.5495064854621887
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.19999998807907104,
+      "bleu1_raw": 0.09999999403953552,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.1818181872367859,
+      "rouge1_fmeasure_raw": 0.1111111119389534,
+      "rouge1_precision_mtv": 0.20000000298023224,
+      "rouge1_precision_raw": 0.10000000149011612,
+      "rouge1_recall_mtv": 0.1666666716337204,
+      "rouge1_recall_raw": 0.125,
+      "wer": 1.2857142686843872
+    }
+  },
+  "7": {
+    "gen_text": "He was born in San Francisco where his father was a sales manager.",
+    "sentiment_probs": [
+      0.33556491136550903,
+      0.36532095074653625,
+      0.2991141080856323
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.1263064593076706,
+      0.14090503752231598,
+      0.10144055634737015,
+      0.11876986920833588,
+      0.0921824499964714,
+      0.10617909580469131,
+      0.1053013727068901,
+      0.10651662200689316,
+      0.10239852964878082
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5082160830497742,
+      0.49178385734558105
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.46150216460227966,
+      0.5384978652000427
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.23076923191547394,
+      "bleu1_raw": 0.1424555480480194,
+      "bleu2_mtv": 0.1386750340461731,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.23076923191547394,
+      "rouge1_fmeasure_raw": 0.2222222238779068,
+      "rouge1_precision_mtv": 0.23076923191547394,
+      "rouge1_precision_raw": 0.23076923191547394,
+      "rouge1_recall_mtv": 0.23076923191547394,
+      "rouge1_recall_raw": 0.2142857164144516,
+      "wer": 0.9285714030265808
+    }
+  },
+  "8": {
+    "gen_text": "He was the son of President John Adams and First Lady Abigail Smith.",
+    "sentiment_probs": [
+      0.29501375555992126,
+      0.3607531487941742,
+      0.34423306584358215
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.10637985169887543,
+      0.11821262538433075,
+      0.12412796914577484,
+      0.10391556471586227,
+      0.09877035021781921,
+      0.13866081833839417,
+      0.11547423899173737,
+      0.08682470768690109,
+      0.1076338142156601
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.4612594544887543,
+      0.5387405753135681
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.45048025250434875,
+      0.5495197772979736
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.5384615659713745,
+      "bleu1_raw": 0.07285066694021225,
+      "bleu2_mtv": 0.4236592650413513,
+      "bleu2_raw": 0.06191116198897362,
+      "bleu3_mtv": 0.3658086955547333,
+      "bleu3_raw": 0.054848406463861465,
+      "bleu4_mtv": 0.3145560324192047,
+      "bleu4_raw": 0.047773487865924835,
+      "rouge1_fmeasure_mtv": 0.4000000059604645,
+      "rouge1_fmeasure_raw": 0.27450981736183167,
+      "rouge1_precision_mtv": 0.4615384638309479,
+      "rouge1_precision_raw": 0.5384615659713745,
+      "rouge1_recall_mtv": 0.3529411852359772,
+      "rouge1_recall_raw": 0.18421052396297455,
+      "wer": 0.837837815284729
+    }
+  },
+  "9": {
+    "gen_text": "He was elected the Natrona County High School senior class president, represented the school at Boys State, and played halfback on the football team.",
+    "sentiment_probs": [
+      0.28676849603652954,
+      0.34930339455604553,
+      0.3639281392097473
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11085350066423416,
+      0.1001477986574173,
+      0.09782786667346954,
+      0.13345393538475037,
+      0.12659867107868195,
+      0.1013283059000969,
+      0.09821075946092606,
+      0.10172489285469055,
+      0.1298542469739914
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.571049153804779,
+      0.42895087599754333
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5107405185699463,
+      0.4892594516277313
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.125,
+      "bleu1_raw": 0.0833333283662796,
+      "bleu2_mtv": 0.07372097671031952,
+      "bleu2_raw": 0.06019292399287224,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.1666666716337204,
+      "rouge1_fmeasure_raw": 0.10810811072587967,
+      "rouge1_precision_mtv": 0.125,
+      "rouge1_precision_raw": 0.0833333358168602,
+      "rouge1_recall_mtv": 0.25,
+      "rouge1_recall_raw": 0.1538461595773697,
+      "wer": 1.692307710647583
+    }
+  }
+}

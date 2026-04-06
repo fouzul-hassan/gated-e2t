@@ -87,7 +87,7 @@ if 'loss/total' in data:
     
     ax.set_xlabel('Epoch', fontsize=14)
     ax.set_ylabel('Loss', fontsize=14)
-    ax.set_title('GLIM Pretrain5 — Training Loss', fontsize=16, fontweight='bold')
+    ax.set_title('JEPA Pretraining v2 — Training Loss', fontsize=16, fontweight='bold')
     ax.legend(fontsize=12)
     
     # Annotate start and end
@@ -131,7 +131,7 @@ if available_components:
     
     ax.set_xlabel('Epoch', fontsize=14)
     ax.set_ylabel('Loss', fontsize=14)
-    ax.set_title('GLIM Pretrain5 — Loss Components (VICReg)', fontsize=16, fontweight='bold')
+    ax.set_title('JEPA Pretraining v2 — Loss Components (VICReg)', fontsize=16, fontweight='bold')
     ax.legend(fontsize=10, ncol=2)
     
     plt.tight_layout()
@@ -163,7 +163,7 @@ if 'accuracy/linear_probe' in data:
     
     ax.set_xlabel('Epoch', fontsize=14)
     ax.set_ylabel('Accuracy (%)', fontsize=14)
-    ax.set_title('GLIM Pretrain5 — Linear Probe Accuracy', fontsize=16, fontweight='bold')
+    ax.set_title('JEPA Pretraining v2 — Linear Probe Accuracy', fontsize=16, fontweight='bold')
     
     # Add reference line for chance (binary = 50%)
     ax.axhline(y=50, color='red', linestyle=':', alpha=0.5, label='Chance (50%)')
@@ -237,7 +237,7 @@ if 'accuracy/linear_probe' in data:
 else:
     axes[1, 1].text(0.5, 0.5, 'No linear probe data', ha='center', va='center', fontsize=14)
 
-fig.suptitle('GLIM Pretrain5 — Training Overview', fontsize=18, fontweight='bold', y=1.02)
+fig.suptitle('JEPA Pretraining v2 — Training Overview', fontsize=18, fontweight='bold', y=1.02)
 plt.tight_layout()
 path = os.path.join(OUTPUT_DIR, '04_training_overview.png')
 plt.savefig(path, dpi=150, bbox_inches='tight')
@@ -277,7 +277,7 @@ if 'loss/total' in data:
 
 # ---------- Summary Statistics ----------
 print("\n" + "="*60)
-print("GLIM Pretrain5 — Training Summary")
+print("JEPA Pretraining v2 — Training Summary")
 print("="*60)
 
 if 'loss/total' in data:

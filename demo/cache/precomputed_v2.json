@@ -1,0 +1,682 @@
+{
+  "0": {
+    "gen_text": "It's not a bad movie, but it's not a great one either.",
+    "sentiment_probs": [
+      0.3407254219055176,
+      0.4162442684173584,
+      0.24303032457828522
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.09813329577445984,
+      0.11011894047260284,
+      0.1232069805264473,
+      0.107463039457798,
+      0.1387961506843567,
+      0.10446234047412872,
+      0.10264212638139725,
+      0.1096896231174469,
+      0.10548748075962067
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.53946852684021,
+      0.4605315029621124
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5218670964241028,
+      0.47813284397125244
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.3333333134651184,
+      "bleu1_raw": 0.0,
+      "bleu2_mtv": 0.17407764494419098,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.375,
+      "rouge1_fmeasure_raw": 0.1666666716337204,
+      "rouge1_precision_mtv": 0.4285714328289032,
+      "rouge1_precision_raw": 0.1428571492433548,
+      "rouge1_recall_mtv": 0.3333333432674408,
+      "rouge1_recall_raw": 0.20000000298023224,
+      "wer": 1.3333333730697632
+    }
+  },
+  "1": {
+    "gen_text": "The Emperor's Club is a film with good intentions, but it has some flaws.",
+    "sentiment_probs": [
+      0.306519478559494,
+      0.34767141938209534,
+      0.34580907225608826
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.11038528382778168,
+      0.10486850887537003,
+      0.1232038214802742,
+      0.11316864937543869,
+      0.1341288685798645,
+      0.09803499281406403,
+      0.10788086801767349,
+      0.09623275697231293,
+      0.11209622770547867
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.41134732961654663,
+      0.5886526703834534
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4421547055244446,
+      0.5578453540802002
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.4285714328289032,
+      "bleu1_raw": 0.1610308438539505,
+      "bleu2_mtv": 0.18156826496124268,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.375,
+      "rouge1_fmeasure_raw": 0.34285715222358704,
+      "rouge1_precision_mtv": 0.4000000059604645,
+      "rouge1_precision_raw": 0.4000000059604645,
+      "rouge1_recall_mtv": 0.3529411852359772,
+      "rouge1_recall_raw": 0.30000001192092896,
+      "wer": 0.9444444179534912
+    }
+  },
+  "2": {
+    "gen_text": "This movie is powerful, although it has some flaws, and it will evoke strong emotions, proving that Washington is one of the greatest actors today.",
+    "sentiment_probs": [
+      0.30182042717933655,
+      0.2959827184677124,
+      0.40219682455062866
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.13333384692668915,
+      0.12175805121660233,
+      0.09745391458272934,
+      0.10599203407764435,
+      0.10434877872467041,
+      0.0911925658583641,
+      0.1184738278388977,
+      0.1152782067656517,
+      0.11216877400875092
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.4891374409198761,
+      0.5108625292778015
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4739006757736206,
+      0.5260992646217346
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.23999999463558197,
+      "bleu1_raw": 0.06293022632598877,
+      "bleu2_mtv": 0.09999999403953552,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.23529411852359772,
+      "rouge1_fmeasure_raw": 0.14035087823867798,
+      "rouge1_precision_mtv": 0.23999999463558197,
+      "rouge1_precision_raw": 0.1599999964237213,
+      "rouge1_recall_mtv": 0.23076923191547394,
+      "rouge1_recall_raw": 0.125,
+      "wer": 0.9677419066429138
+    }
+  },
+  "3": {
+    "gen_text": "John Adams graduated from Harvard University in 1755 and was elected to Phi Beta Kappa.",
+    "sentiment_probs": [
+      0.3437408208847046,
+      0.37239909172058105,
+      0.28386014699935913
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.10483121871948242,
+      0.093878373503685,
+      0.11925424635410309,
+      0.1369260996580124,
+      0.11312839388847351,
+      0.1405501514673233,
+      0.10290403664112091,
+      0.09242291748523712,
+      0.09610462933778763
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.4532618820667267,
+      0.5467381477355957
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5153759717941284,
+      0.4846239984035492
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.06666666269302368,
+      "bleu1_raw": 0.06666666269302368,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.07999999821186066,
+      "rouge1_fmeasure_raw": 0.07407407462596893,
+      "rouge1_precision_mtv": 0.06666667014360428,
+      "rouge1_precision_raw": 0.06666667014360428,
+      "rouge1_recall_mtv": 0.10000000149011612,
+      "rouge1_recall_raw": 0.0833333358168602,
+      "wer": 1.25
+    }
+  },
+  "4": {
+    "gen_text": "He moved to San Juan where he started to work for the Texas Company as a file clerk.",
+    "sentiment_probs": [
+      0.3531672954559326,
+      0.400973379611969,
+      0.245859295129776
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.09971676766872406,
+      0.10861212015151978,
+      0.11963706463575363,
+      0.11789734661579132,
+      0.10583741962909698,
+      0.13918860256671906,
+      0.10521909594535828,
+      0.10563090443611145,
+      0.09826071560382843
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5348251461982727,
+      0.46517491340637207
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5029296278953552,
+      0.4970703423023224
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.277777761220932,
+      "bleu1_raw": 0.149139866232872,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.17142857611179352,
+      "rouge1_fmeasure_raw": 0.15789473056793213,
+      "rouge1_precision_mtv": 0.1666666716337204,
+      "rouge1_precision_raw": 0.1666666716337204,
+      "rouge1_recall_mtv": 0.1764705926179886,
+      "rouge1_recall_raw": 0.15000000596046448,
+      "wer": 0.8999999761581421
+    }
+  },
+  "5": {
+    "gen_text": "He was a member of the United States House of Representatives from New York and the United States House of Representatives from New Jersey.",
+    "sentiment_probs": [
+      0.37154948711395264,
+      0.3416195511817932,
+      0.28683093190193176
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.0937502384185791,
+      0.10561230778694153,
+      0.1366724818944931,
+      0.08817777782678604,
+      0.14864660799503326,
+      0.0914444699883461,
+      0.0925675705075264,
+      0.13092420995235443,
+      0.11220435053110123
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5720056891441345,
+      0.4279943108558655
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4632014334201813,
+      0.5367985367774963
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.25,
+      "bleu1_raw": 0.125,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.1875,
+      "rouge1_fmeasure_raw": 0.1818181872367859,
+      "rouge1_precision_mtv": 0.125,
+      "rouge1_precision_raw": 0.125,
+      "rouge1_recall_mtv": 0.375,
+      "rouge1_recall_raw": 0.3333333432674408,
+      "wer": 2.3333332538604736
+    }
+  },
+  "6": {
+    "gen_text": "He was not satisfied.",
+    "sentiment_probs": [
+      0.3417719304561615,
+      0.35365551710128784,
+      0.30457255244255066
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.092824786901474,
+      0.09355282038450241,
+      0.11631470918655396,
+      0.12357477843761444,
+      0.1300756186246872,
+      0.1316731870174408,
+      0.10559593886137009,
+      0.10621647536754608,
+      0.10017167776823044
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5489152669906616,
+      0.451084703207016
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5226285457611084,
+      0.4773714542388916
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.2361832708120346,
+      "bleu1_raw": 0.2361832708120346,
+      "bleu2_mtv": 0.19284282624721527,
+      "bleu2_raw": 0.19284282624721527,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.3333333432674408,
+      "rouge1_fmeasure_raw": 0.3333333432674408,
+      "rouge1_precision_mtv": 0.5,
+      "rouge1_precision_raw": 0.5,
+      "rouge1_recall_mtv": 0.25,
+      "rouge1_recall_raw": 0.25,
+      "wer": 0.7142857313156128
+    }
+  },
+  "7": {
+    "gen_text": "He worked as a social worker and leader of Greenwich council.",
+    "sentiment_probs": [
+      0.3291237950325012,
+      0.3122173845767975,
+      0.3586587905883789
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.10127018392086029,
+      0.13634048402309418,
+      0.12535765767097473,
+      0.09281736612319946,
+      0.15877673029899597,
+      0.07700468599796295,
+      0.10164172202348709,
+      0.1027645468711853,
+      0.1040266826748848
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.36840569972991943,
+      0.6315943002700806
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5426208972930908,
+      0.4573790729045868
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.3636363744735718,
+      "bleu1_raw": 0.20762738585472107,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.23999999463558197,
+      "rouge1_fmeasure_raw": 0.23999999463558197,
+      "rouge1_precision_mtv": 0.27272728085517883,
+      "rouge1_precision_raw": 0.27272728085517883,
+      "rouge1_recall_mtv": 0.2142857164144516,
+      "rouge1_recall_raw": 0.2142857164144516,
+      "wer": 1.0
+    }
+  },
+  "8": {
+    "gen_text": "He was educated at Chesterfield School and St. John's College, Cambridge.",
+    "sentiment_probs": [
+      0.3763737380504608,
+      0.31942424178123474,
+      0.30420202016830444
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.093568354845047,
+      0.11967574805021286,
+      0.1294003278017044,
+      0.08666343241930008,
+      0.13882628083229065,
+      0.08040045201778412,
+      0.09931161254644394,
+      0.1421184539794922,
+      0.11003533750772476
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.5804114937782288,
+      0.41958850622177124
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.5945512652397156,
+      0.40544870495796204
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.3320366144180298,
+      "bleu1_raw": 0.02565750479698181,
+      "bleu2_mtv": 0.1741214543581009,
+      "bleu2_raw": 0.01553638931363821,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.23999999463558197,
+      "rouge1_fmeasure_raw": 0.1599999964237213,
+      "rouge1_precision_mtv": 0.25,
+      "rouge1_precision_raw": 0.3333333432674408,
+      "rouge1_recall_mtv": 0.23076923191547394,
+      "rouge1_recall_raw": 0.10526315867900848,
+      "wer": 0.9189189076423645
+    }
+  },
+  "9": {
+    "gen_text": "The director won directing Emmys for his work on the original 1954 CBS teleplay, Twelve Angry Men.",
+    "sentiment_probs": [
+      0.3121989369392395,
+      0.35933879017829895,
+      0.32846224308013916
+    ],
+    "sentiment_labels": [
+      "negative",
+      "neutral",
+      "positive"
+    ],
+    "relation_probs": [
+      0.0881083533167839,
+      0.10341227799654007,
+      0.12031229585409164,
+      0.08085276931524277,
+      0.1384786069393158,
+      0.09829197824001312,
+      0.13599924743175507,
+      0.11446695774793625,
+      0.12007754296064377
+    ],
+    "relation_labels": [
+      "awarding",
+      "education",
+      "employment",
+      "foundation",
+      "job title",
+      "nationality",
+      "political affiliation",
+      "visit",
+      "marriage"
+    ],
+    "corpus_probs": [
+      0.577852725982666,
+      0.4221472442150116
+    ],
+    "corpus_labels": [
+      "movie review",
+      "biography"
+    ],
+    "paradigm_probs": [
+      0.4660557210445404,
+      0.5339442491531372
+    ],
+    "paradigm_labels": [
+      "NR",
+      "TSR"
+    ],
+    "text_metrics": {
+      "bleu1_mtv": 0.05882352963089943,
+      "bleu1_raw": 0.0,
+      "bleu2_mtv": 0.0,
+      "bleu2_raw": 0.0,
+      "bleu3_mtv": 0.0,
+      "bleu3_raw": 0.0,
+      "bleu4_mtv": 0.0,
+      "bleu4_raw": 0.0,
+      "rouge1_fmeasure_mtv": 0.06896551698446274,
+      "rouge1_fmeasure_raw": 0.0,
+      "rouge1_precision_mtv": 0.05882352963089943,
+      "rouge1_precision_raw": 0.0,
+      "rouge1_recall_mtv": 0.0833333358168602,
+      "rouge1_recall_raw": 0.0,
+      "wer": 1.307692289352417
+    }
+  }
+}

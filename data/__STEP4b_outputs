@@ -1,0 +1,85 @@
+(base) E:\MSc Files\MSc Project\gated-glim\GLIM\data>python __STEP4b_benchmarking_eeg_text_match.py
+Loading dataframes...
+  EEG df:      (4679, 6)   cols: ['eeg', 'mask', 'text', 'dataset', 'task', 'subject']
+  Label table: (1888, 17)
+
+============================================================
+Text match rate: 4679 / 4679 (100.0%)
+Unmatched rows: 0
+
+============================================================
+Building text → label_id lookup (preferring ZuCo2 rows)...
+  Original label_table rows: 1888
+  Deduped (1 row per unique text): 1556
+  Dataset distribution in deduped:
+dataset  task 
+ZuCo1    task1    400
+         task2    179
+         task3    284
+ZuCo2    task2    364
+         task3    329
+label_id assigned: 4679 / 4679
+label_id missing:  0
+
+============================================================
+Merging with deduped label table...
+  Merged shape: (4679, 21)  (expected: (4679, ...)
+  ✅ No row explosion confirmed
+  Columns: ['eeg', 'mask', 'subject', 'label id', 'raw text', 'dataset', 'task', 'control', 'raw label', 'input text', 'text uid', 'sentiment label', 'relation label', 'lexical simplification (v0)', 'lexical simplification (v1)', 'semantic clarity (v0)', 'semantic clarity (v1)', 'syntax simplification (v0)', 'syntax simplification (v1)', 'naive rewritten', 'naive simplified']
+
+============================================================
+Final schema:
+  ✅ eeg
+  ✅ mask
+  ✅ subject
+  ✅ label id
+  ✅ raw text
+  ✅ dataset
+  ✅ task
+  ✅ control
+  ✅ raw label
+  ✅ input text
+  ✅ text uid
+  ✅ sentiment label
+  ✅ relation label
+  ✅ phase
+
+============================================================
+Records by subject:
+subject
+XAH    592
+XBB    518
+XBD    491
+XDT    470
+XLS    475
+XPB    310
+XSE    455
+XSS    293
+XTR    455
+XWS    620
+
+Records by dataset/task (from label table):
+dataset  task
+ZuCo2    task2    2702
+         task3    1977
+
+Sentiment label distribution:
+Series([], )
+
+phase: <StringArray>
+['benchmarking']
+Length: 1, dtype: str
+
+✅ Saved 4679 records to ./tmp/zuco_eeg_label_benchmarking.df
+
+Sample row:
+  subject:         XAH
+  dataset/task:    ZuCo2 / task3
+  text_uid:        491
+  input text:      'William Hindman (April 1, 1743 - January 19, 1822) was an American law'
+  sentiment label: nan
+  relation label:  nationality
+  phase:           benchmarking
+  eeg shape:       (1280, 128)
+
+(base) E:\MSc Files\MSc Project\gated-glim\GLIM\data>

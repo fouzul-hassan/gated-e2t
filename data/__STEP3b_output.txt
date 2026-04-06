@@ -1,0 +1,48 @@
+(base) E:\MSc Files\MSc Project\gated-glim\GLIM\data>python __STEP3b_benchmarking_eeg_preproc.py
+Loading ZuCo2 task material sentences...
+  ZuCo2 sentences loaded: 370 NR + 411 TSR
+  Ordered list length: 782 (1-indexed, index 0 = None)
+
+Found 10 .mat files:
+  resultsXAH.mat
+  resultsXBB.mat
+  resultsXBD.mat
+  resultsXDT.mat
+  resultsXLS.mat
+  resultsXPB.mat
+  resultsXSE.mat
+  resultsXSS.mat
+  resultsXTR.mat
+  resultsXWS.mat
+
+  XAH: 592/739 recorded  [dropped: inf=129, len=18, bad_sid=0]
+  XBB: 518/739 recorded  [dropped: inf=178, len=43, bad_sid=0]
+  XBD: 491/739 recorded  [dropped: inf=197, len=51, bad_sid=0]
+  XDT: 470/739 recorded  [dropped: inf=113, len=156, bad_sid=0]
+  XLS: 475/739 recorded  [dropped: inf=182, len=82, bad_sid=0]
+  XPB: 310/739 recorded  [dropped: inf=359, len=70, bad_sid=0]
+  XSE: 455/739 recorded  [dropped: inf=238, len=46, bad_sid=0]
+  XSS: 293/739 recorded  [dropped: inf=406, len=40, bad_sid=0]
+  XTR: 455/739 recorded  [dropped: inf=206, len=78, bad_sid=0]
+  XWS: 620/739 recorded  [dropped: inf=64, len=55, bad_sid=0]
+  Processing benchmarking subjects... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% • 0:01:29
+
+============================================================
+Total records: 4679
+Columns: ['eeg', 'mask', 'text', 'dataset', 'task', 'subject']
+Subjects: {'XWS': 620, 'XAH': 592, 'XBB': 518, 'XBD': 491, 'XLS': 475, 'XDT': 470, 'XSE': 455, 'XTR': 455, 'XPB': 310, 'XSS': 293}
+
+EEG shape check:  (1280, 128)  (expected: (1280, 128))
+Mask shape check: (1280,)  (expected: (1280,))
+
+Sample text[0]: 'William Hindman (April 1, 1743 - January 19, 1822) was an American lawyer and st'
+
+✅ Saved to ./tmp/zuco_eeg_benchmarking.df
+
+Next: run STEP4 to match texts against label table and add labels.
+
+==================================================================
+4,679 total records across 10 subjects
+EEG shape (1280, 128) ✅, Mask (1280,) ✅
+bad_sid=0 for all subjects ✅
+The high inf drop rates for XPB/XSS (~40-58%) are normal — the benchmarking paper mentions some subjects had noisier EEG recordings.

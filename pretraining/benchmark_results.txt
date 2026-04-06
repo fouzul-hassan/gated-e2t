@@ -1,0 +1,79 @@
+(base) E:\MSc Files\MSc Project\gated-glim\GLIM>python pretraining/evaluate_benchmarking_probe.py --ckpt pretraining/Results/GLIM_Pretrain1/best_model.pth --main_data data/tmp/zuco_eeg_label_8variants.df --bench_data data/tmp/zuco_eeg_label_benchmarking.df
+============================================================
+  ZERO-SHOT MULTI-PROBE ON BENCHMARKING DATA
+============================================================
+
+📦 Loading checkpoint: pretraining/Results/GLIM_Pretrain1/best_model.pth
+   ✅ Pretrained Model loaded
+📂 Loading data from data/tmp/zuco_eeg_label_8variants.df
+   Train samples: 17908 | Test samples: 2227
+📂 Loading data from data/tmp/zuco_eeg_label_benchmarking.df
+   Benchmarking samples: 4679
+
+🔍 Extracting features from frozen encoder (Main Train)...
+🔍 Extracting features from frozen encoder (Main Test)...
+🔍 Extracting features from frozen encoder (Benchmarking)...
+
+────────────────────────────────────────────────────────────
+📊 Reading Paradigm (NR vs TSR)
+────────────────────────────────────────────────────────────
+   Classes (2): [np.str_('NR'), np.str_('TSR')]
+   Random baseline: 50.0%
+
+   Training Logistic Regression Head...
+   ✅ [TRAIN] Accuracy: 64.7%
+   ✅ [TEST]  Accuracy: 61.1%  (Baseline transfer)
+   🚀 [BENCH] Accuracy: 52.3%  (Zero-shot Subject Transfer)
+
+   📋 Benchmarking Per-Class Report:
+                 precision    recall  f1-score   support
+
+             NR      0.580     0.628     0.603      2702
+            TSR      0.427     0.379     0.402      1977
+
+       accuracy                          0.523      4679
+      macro avg      0.504     0.504     0.503      4679
+   weighted avg      0.516     0.523     0.518      4679
+
+
+────────────────────────────────────────────────────────────
+📊 Relation Classification
+────────────────────────────────────────────────────────────
+   Classes (9): [np.str_('awarding'), np.str_('education'), np.str_('employment'), np.str_('foundation'), np.str_('job title'), np.str_('marriage'), np.str_('nationality'), np.str_('political affiliation'), np.str_('visit')]      
+   Random baseline: 11.1%
+
+   Training Logistic Regression Head...
+   ✅ [TRAIN] Accuracy: 23.5%
+   ✅ [TEST]  Accuracy: 15.6%  (Baseline transfer)
+   🚀 [BENCH] Accuracy: 14.6%  (Zero-shot Subject Transfer)
+
+   📋 Benchmarking Per-Class Report:
+C:\Users\ASUS\AppData\Roaming\Python\Python313\site-packages\sklearn\metrics\_classification.py:1833: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", result.shape[0])
+C:\Users\ASUS\AppData\Roaming\Python\Python313\site-packages\sklearn\metrics\_classification.py:1833: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", result.shape[0])
+C:\Users\ASUS\AppData\Roaming\Python\Python313\site-packages\sklearn\metrics\_classification.py:1833: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", result.shape[0])
+                          precision    recall  f1-score   support
+
+                awarding      0.000     0.000     0.000         0
+               education      0.159     0.068     0.095       428
+              employment      0.164     0.207     0.183       299
+              foundation      0.005     0.111     0.010         9
+               job title      0.182     0.164     0.172       342
+                marriage      0.159     0.159     0.159       289
+             nationality      0.162     0.129     0.143       365
+   political affiliation      0.152     0.192     0.169       245
+                   visit      0.000     0.000     0.000         0
+
+                accuracy                          0.146      1977
+               macro avg      0.109     0.114     0.104      1977
+            weighted avg      0.163     0.146     0.149      1977
+
+
+============================================================
+  ✅ Evaluation Complete!
+============================================================
+
+
+python pretraining/evaluate_benchmarking_probe_svm.py --ckpt pretraining/Results/GLIM_Pretrain1/best_model.pth --main_data data/tmp/zuco_eeg_label_8variants.df --bench_data data/tmp/zuco_eeg_label_benchmarking.df

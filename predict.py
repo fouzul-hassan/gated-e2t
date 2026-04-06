@@ -4,9 +4,10 @@ Matches the metrics from predict_corpus.ipynb, predict_relation.ipynb, and predi
 
 Metrics computed:
   - clip-like acc: EEG-based prediction accuracy
-  - clip-like acc [raw input text]: Text embedding accuracy using ground truth text
-  - clip-like acc [gen text]: Text embedding accuracy using generated text
-  - llm-pred acc: LLM-based classification accuracy (optional, requires HF token)
+  - clip-like acc [raw input text]: Text embedding accuracy using ground truth text (top-1; top-3 for relation)
+  - clip-like acc [gen text]: Text embedding accuracy using generated text (top-1; top-3 for relation)
+  - llm-pred acc [gen]: LLM-based classification accuracy on generated text (optional, requires HF token)
+  - llm-pred acc [raw]: LLM-based classification accuracy on raw input text (optional, requires HF token)
 
 Usage:
     python predict.py --checkpoint <path> --task corpus
@@ -19,18 +20,76 @@ Usage:
 import argparse
 import os
 import torch
+import numpy as np
 import pandas as pd
 from rich.progress import track
 from rich import print as rprint
 from rich.table import Table
 from rich.console import Console
-from torch.utils.data import DataLoader
-from torchmetrics.functional.classification import multiclass_accuracy
+from torch.utils.data import DataLoader, Dataset
+from torchmetrics.functional.classification import multiclass_accuracy, binary_accuracy
 
 from model.glim import GLIM
 from data.datamodule import GLIMDataModule
 
 console = Console()
+
+
+# ── Benchmarking dataset (held-out subjects, no phase split) ─────────────────
+class BenchmarkingDataset(Dataset):
+    """
+    Lightweight wrapper for the held-out benchmarking subjects dataframe.
+    Mirrors only the fields needed for predict_reading_paradigm().
+    """
+    input_template = "To English: <MASK>"
+
+    def __init__(self, df: pd.DataFrame):
+        self.raw_input_text = df['input text'].tolist()
+        self.input_text = [self.input_template.replace('<MASK>', s) for s in self.raw_input_text]
+        raw_t_keys = df['task'].tolist()
+        t_prompts = ['<NR>' if k != 'task3' else '<TSR>' for k in raw_t_keys]
+        d_prompts = df['dataset'].tolist()
+        s_prompts = df['subject'].tolist()
+        self.prompts = list(zip(t_prompts, d_prompts, s_prompts))
+        self.raw_task_keys = raw_t_keys
+        self.sentiment_labels = df['sentiment label'].apply(str).tolist()
+        self.relation_labels = df['relation label'].apply(str).tolist()
+        eeg_list = df['eeg'].tolist()
+        mask_list = df['mask'].tolist()
+        # Normalise shape: ensure (T, C)
+        self.eeg = []
+        self.mask = []
+        for e, m in zip(eeg_list, mask_list):
+            e = np.array(e, dtype=np.float32)
+            if e.shape[0] == 128:   # (C, T) → (T, C)
+                e = e.T
+            self.eeg.append(e)
+            self.mask.append(np.array(m, dtype=np.int8))
+
+    def __len__(self):
+        return len(self.eeg)
+
+    def __getitem__(self, idx):
+        return {
+            'eeg':           torch.from_numpy(self.eeg[idx]),
+            'mask':          torch.from_numpy(self.mask[idx]),
+            'prompt':        self.prompts[idx],
+            'raw task key':  self.raw_task_keys[idx],
+            'raw input text': self.raw_input_text[idx],
+            'sentiment label': self.sentiment_labels[idx],
+            'relation label':  self.relation_labels[idx],
+        }
+
+
+def make_benchmarking_loader(bench_data_path: str, batch_size: int = 24) -> DataLoader:
+    """Load the held-out benchmarking .df and wrap it in a DataLoader."""
+    print(f"Loading benchmarking data from {bench_data_path}...")
+    df = pd.read_pickle(bench_data_path)
+    dataset = BenchmarkingDataset(df)
+    print(f"   Benchmarking samples: {len(dataset)}")
+    # Simple sequential loader — no special sampler needed for inference
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+    return loader
 
 
 def load_model_and_data(checkpoint_path, data_path, batch_size=24, device='cuda:0'):
@@ -42,6 +101,7 @@ def load_model_and_data(checkpoint_path, data_path, batch_size=24, device='cuda:
         checkpoint_path,
         map_location=device,
         strict=False,
+        weights_only=False,
     )
     model.setup(stage='test')
     model.eval()
@@ -93,16 +153,22 @@ def load_llm_pipeline(device='cuda:0'):
     return pipe
 
 
-def compute_llm_accuracy(pipe, results, task_type, labels, num_classes):
+def compute_llm_accuracy(pipe, results, task_type, labels, num_classes, input_type='gen'):
     """
     Compute LLM-based classification accuracy.
     Matches the notebook approaches exactly:
     - corpus: integer labels, max_new_tokens=4
     - relation: top-3 text labels, max_new_tokens=16
     - sentiment: text labels, max_new_tokens=8
+
+    Args:
+        input_type: 'gen' to use generated text (default), 'raw' to use raw input text.
     """
-    # Use generated text for evaluation
-    input_sentences = [r['gen_text'] for r in results]
+    # Choose text source
+    if input_type == 'raw':
+        input_sentences = [r['raw_input_text'] for r in results]
+    else:
+        input_sentences = [r['gen_text'] for r in results]
     
     if task_type == 'corpus':
         instructions = {
@@ -273,12 +339,15 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item():.4f}")
     table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item():.4f}")
     
-    # LLM accuracy (optional)
+    # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe:
-        llm_acc, _ = compute_llm_accuracy(llm_pipe, results, 'corpus', all_labels, 2)
-        table.add_row("llm-pred acc", f"{llm_acc:.4f}")
+        llm_acc_gen, _ = compute_llm_accuracy(llm_pipe, results, 'corpus', all_labels, 2, input_type='gen')
+        llm_acc_raw, _ = compute_llm_accuracy(llm_pipe, results, 'corpus', all_labels, 2, input_type='raw')
+        table.add_row("LLM acc [gen]", f"{llm_acc_gen:.4f}")
+        table.add_row("LLM acc [raw]", f"{llm_acc_raw:.4f}")
+        llm_acc = llm_acc_gen  # legacy key
     else:
-        llm_acc = None
+        llm_acc_gen, llm_acc_raw, llm_acc = None, None, None
     
     console.print(table)
     
@@ -288,6 +357,8 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
         'clip_acc_raw': clip_acc_raw.item(),
         'clip_acc_gen': clip_acc_gen.item(),
         'llm_acc': llm_acc,
+        'llm_acc_gen': llm_acc_gen,
+        'llm_acc_raw': llm_acc_raw,
     }
 
 
@@ -353,10 +424,17 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="To English: <MASK>.")
-        clip_acc_raw = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
-        clip_acc_gen = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc_raw1 = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
+        clip_acc_raw3 = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc_gen1 = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
+        clip_acc_gen3 = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        # Keep backward-compatible aliases (top-3 as primary, matching notebook)
+        clip_acc_raw = clip_acc_raw3
+        clip_acc_gen = clip_acc_gen3
     else:
-        clip_acc1, clip_acc3, clip_acc_raw, clip_acc_gen = 0, 0, 0, 0
+        clip_acc1, clip_acc3 = 0, 0
+        clip_acc_raw1, clip_acc_raw3, clip_acc_gen1, clip_acc_gen3 = 0, 0, 0, 0
+        clip_acc_raw, clip_acc_gen = 0, 0
     
     # Results table
     table = Table(title="Relation Classification Results")
@@ -365,15 +443,23 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     
     table.add_row("EEG Acc (Top-1)", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
     table.add_row("EEG Acc (Top-3)", f"{clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3:.4f}")
-    table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
-    table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
+    table.add_row("Text Acc Raw (Top-1)", f"{clip_acc_raw1.item() if torch.is_tensor(clip_acc_raw1) else clip_acc_raw1:.4f}")
+    table.add_row("Text Acc Raw (Top-3)", f"{clip_acc_raw3.item() if torch.is_tensor(clip_acc_raw3) else clip_acc_raw3:.4f}")
+    table.add_row("Text Acc Gen (Top-1)", f"{clip_acc_gen1.item() if torch.is_tensor(clip_acc_gen1) else clip_acc_gen1:.4f}")
+    table.add_row("Text Acc Gen (Top-3)", f"{clip_acc_gen3.item() if torch.is_tensor(clip_acc_gen3) else clip_acc_gen3:.4f}")
     
-    # LLM accuracy
+    # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe and all_labels:
-        llm_acc1, llm_acc3 = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types))
-        table.add_row("llm-pred acc-top1", f"{llm_acc1:.4f}")
-        table.add_row("llm-pred acc-top3", f"{llm_acc3:.4f}")
+        llm_acc1_gen, llm_acc3_gen = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='gen')
+        llm_acc1_raw, llm_acc3_raw = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='raw')
+        table.add_row("LLM acc-top1 [gen]", f"{llm_acc1_gen:.4f}")
+        table.add_row("LLM acc-top3 [gen]", f"{llm_acc3_gen:.4f}")
+        table.add_row("LLM acc-top1 [raw]", f"{llm_acc1_raw:.4f}")
+        table.add_row("LLM acc-top3 [raw]", f"{llm_acc3_raw:.4f}")
+        # Keep legacy keys for summary table backward-compat
+        llm_acc1, llm_acc3 = llm_acc1_gen, llm_acc3_gen
     else:
+        llm_acc1_gen, llm_acc3_gen, llm_acc1_raw, llm_acc3_raw = None, None, None, None
         llm_acc1, llm_acc3 = None, None
     
     console.print(table)
@@ -391,10 +477,19 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         'results': results,
         'clip_acc1': clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1,
         'clip_acc3': clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3,
+        'clip_acc_raw1': clip_acc_raw1.item() if torch.is_tensor(clip_acc_raw1) else clip_acc_raw1,
+        'clip_acc_raw3': clip_acc_raw3.item() if torch.is_tensor(clip_acc_raw3) else clip_acc_raw3,
+        'clip_acc_gen1': clip_acc_gen1.item() if torch.is_tensor(clip_acc_gen1) else clip_acc_gen1,
+        'clip_acc_gen3': clip_acc_gen3.item() if torch.is_tensor(clip_acc_gen3) else clip_acc_gen3,
+        # Keep old keys pointing to top-3 for backward-compat
         'clip_acc_raw': clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw,
         'clip_acc_gen': clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen,
         'llm_acc_top1': llm_acc1,
         'llm_acc_top3': llm_acc3,
+        'llm_acc_top1_gen': llm_acc1_gen,
+        'llm_acc_top3_gen': llm_acc3_gen,
+        'llm_acc_top1_raw': llm_acc1_raw,
+        'llm_acc_top3_raw': llm_acc3_raw,
     }
 
 
@@ -470,13 +565,16 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
     table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
     
-    # LLM accuracy
+    # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe and all_labels:
-        llm_acc1, llm_acc3 = compute_llm_accuracy(llm_pipe, valid_results, 'sentiment', all_labels, len(sentiment_types))
-        table.add_row("llm-pred acc-top1", f"{llm_acc1:.4f}")
-        table.add_row("llm-pred acc-top3", f"{llm_acc3:.4f}")
+        llm_acc1_gen, _ = compute_llm_accuracy(llm_pipe, valid_results, 'sentiment', all_labels, len(sentiment_types), input_type='gen')
+        llm_acc1_raw, _ = compute_llm_accuracy(llm_pipe, valid_results, 'sentiment', all_labels, len(sentiment_types), input_type='raw')
+        table.add_row("LLM acc [gen]", f"{llm_acc1_gen:.4f}")
+        table.add_row("LLM acc [raw]", f"{llm_acc1_raw:.4f}")
+        llm_acc1 = llm_acc1_gen  # legacy key
     else:
-        llm_acc1, llm_acc3 = None, None
+        llm_acc1_gen, llm_acc1_raw = None, None
+        llm_acc1 = None
     
     console.print(table)
     console.print(f"Valid samples: {len(all_labels)}")
@@ -487,7 +585,101 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
         'clip_acc_raw': clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw,
         'clip_acc_gen': clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen,
         'llm_acc_top1': llm_acc1,
-        'llm_acc_top3': llm_acc3,
+        'llm_acc_top1_gen': llm_acc1_gen,
+        'llm_acc_top1_raw': llm_acc1_raw,
+    }
+
+
+def predict_reading_paradigm(model, loader, device, split_label: str = 'main_test'):
+    """
+    Binary zero-shot classification: Normal Reading (NR) vs Task-Specific Reading (TSR).
+
+    The task prompt token is REPLACED with '<UNK>' so the model cannot 'cheat'
+    by reading the ground-truth task label from the prompt.  Only EEG signal
+    (and dataset/subject context) is used → genuine cross-subject zero-shot test.
+
+    NR  = task1 / task2  (label 0)
+    TSR = task3          (label 1)
+    """
+    console.print("\n" + "="*80, style="bold magenta")
+    console.print(f"READING PARADIGM CLASSIFICATION  [{split_label.upper()}]", style="bold magenta")
+    console.print("="*80 + "\n", style="bold magenta")
+
+    # Candidate text descriptions — intentionally generic (no ZuCo-specific jargon)
+    candidates = [
+        "Normal reading: the participant reads sentences for general comprehension",
+        "Task-specific reading: the participant reads sentences to extract semantic relations",
+    ]
+
+    results = []
+    all_labels = []
+    all_probs  = []
+    nr_count   = 0
+    tsr_count  = 0
+
+    with torch.no_grad():
+        for batch in track(loader, description=f"[EEG] Reading-paradigm ({split_label})"):
+            eeg      = batch['eeg'].to(device)
+            eeg_mask = batch['mask'].to(device)
+            raw_task_key = batch['raw task key']   # list[str]
+
+            # ---------- BLIND the task token → <UNK> ----------
+            # batch['prompt'] is a tuple-of-lists after DataLoader collation:
+            #   (list[task_str], list[dataset_str], list[subject_str])
+            orig_prompts = batch['prompt']
+            neutral_prompts = (
+                tuple(['<UNK>'] * len(orig_prompts[0])),   # task  → <UNK>
+                orig_prompts[1],                            # dataset kept
+                orig_prompts[2],                            # subject kept
+            )
+            # ---------------------------------------------------
+
+            labels = [0 if k in ('task1', 'task2') else 1 for k in raw_task_key]
+            nr_count  += labels.count(0)
+            tsr_count += labels.count(1)
+
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                prob, _ = model.predict(eeg, eeg_mask, neutral_prompts, candidates, generate=False)
+
+            all_labels.extend(labels)
+            all_probs.append(prob)
+
+            for i in range(len(eeg)):
+                results.append({
+                    'raw_input_text': batch['raw input text'][i],
+                    'raw_task_key':   raw_task_key[i],
+                    'label':          labels[i],
+                    'pred':           prob[i].argmax().item(),
+                    'prob_NR':        prob[i][0].item(),
+                    'prob_TSR':       prob[i][1].item(),
+                })
+
+    # ── Accuracy ──────────────────────────────────────────────────────────────
+    probs_t        = torch.cat(all_probs, dim=0)           # (N, 2)
+    labels_t       = torch.tensor(all_labels, device=probs_t.device)
+    acc            = binary_accuracy(probs_t[:, 1], labels_t.float())
+    n_correct      = sum(1 for r in results if r['pred'] == r['label'])
+
+    # ── Display ───────────────────────────────────────────────────────────────
+    console.print(f"[dim]Label distribution → NR: {nr_count}  |  TSR: {tsr_count}[/dim]")
+    console.print(f"[dim]Random baseline: {max(nr_count, tsr_count) / (nr_count + tsr_count):.4f}[/dim]")
+
+    table = Table(title=f"Reading Paradigm Results [{split_label}]")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value",  style="green")
+    table.add_row("ACC (NR vs TSR)",  f"{acc.item():.4f}")
+    table.add_row("N correct / Total", f"{n_correct} / {len(results)}")
+    table.add_row("NR samples",  str(nr_count))
+    table.add_row("TSR samples", str(tsr_count))
+    table.add_row("Random baseline", f"{max(nr_count, tsr_count) / (nr_count + tsr_count):.4f}")
+    console.print(table)
+
+    return {
+        'results':   results,
+        'clip_acc':  acc.item(),
+        'nr_count':  nr_count,
+        'tsr_count': tsr_count,
+        'split':     split_label,
     }
 
 
@@ -511,29 +703,47 @@ def save_results_to_txt(all_results, output_dir, checkpoint_path):
             f.write(f"  Summary Metrics\n")
             f.write(f"{'-'*40}\n")
             
-            if task == 'corpus':
-                f.write(f"  EEG Accuracy:        {data.get('clip_acc', 0):.4f}\n")
-                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
-                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
-                if data.get('llm_acc') is not None:
-                    f.write(f"  LLM-Pred Acc:        {data['llm_acc']:.4f}\n")
+            if task in ('reading_paradigm_main', 'reading_paradigm_bench'):
+                nr  = data.get('nr_count', 0)
+                tsr = data.get('tsr_count', 0)
+                baseline = max(nr, tsr) / (nr + tsr) if (nr + tsr) > 0 else 0.0
+                f.write(f"  Split:                  {data.get('split', task)}\n")
+                f.write(f"  NR samples:             {nr}\n")
+                f.write(f"  TSR samples:            {tsr}\n")
+                f.write(f"  Random baseline:        {baseline:.4f}\n")
+                f.write(f"  ACC (NR vs TSR):        {data.get('clip_acc', 0):.4f}\n")
+
+            elif task == 'corpus':
+                f.write(f"  EEG Accuracy:           {data.get('clip_acc', 0):.4f}\n")
+                f.write(f"  Text Acc (Raw):         {data.get('clip_acc_raw', 0):.4f}\n")
+                f.write(f"  Text Acc (Gen):         {data.get('clip_acc_gen', 0):.4f}\n")
+                if data.get('llm_acc_gen') is not None:
+                    f.write(f"  LLM Acc [gen]:          {data['llm_acc_gen']:.4f}\n")
+                if data.get('llm_acc_raw') is not None:
+                    f.write(f"  LLM Acc [raw]:          {data['llm_acc_raw']:.4f}\n")
             
             elif task == 'relation':
-                f.write(f"  EEG Acc (Top-1):     {data.get('clip_acc1', 0):.4f}\n")
-                f.write(f"  EEG Acc (Top-3):     {data.get('clip_acc3', 0):.4f}\n")
-                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
-                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
-                if data.get('llm_acc_top1') is not None:
-                    f.write(f"  LLM-Pred Acc (Top1): {data['llm_acc_top1']:.4f}\n")
-                    f.write(f"  LLM-Pred Acc (Top3): {data['llm_acc_top3']:.4f}\n")
+                f.write(f"  EEG Acc (Top-1):        {data.get('clip_acc1', 0):.4f}\n")
+                f.write(f"  EEG Acc (Top-3):        {data.get('clip_acc3', 0):.4f}\n")
+                f.write(f"  Text Acc Raw (Top-1):   {data.get('clip_acc_raw1', 0):.4f}\n")
+                f.write(f"  Text Acc Raw (Top-3):   {data.get('clip_acc_raw3', 0):.4f}\n")
+                f.write(f"  Text Acc Gen (Top-1):   {data.get('clip_acc_gen1', 0):.4f}\n")
+                f.write(f"  Text Acc Gen (Top-3):   {data.get('clip_acc_gen3', 0):.4f}\n")
+                if data.get('llm_acc_top1_gen') is not None:
+                    f.write(f"  LLM Acc-Top1 [gen]:     {data['llm_acc_top1_gen']:.4f}\n")
+                    f.write(f"  LLM Acc-Top3 [gen]:     {data['llm_acc_top3_gen']:.4f}\n")
+                if data.get('llm_acc_top1_raw') is not None:
+                    f.write(f"  LLM Acc-Top1 [raw]:     {data['llm_acc_top1_raw']:.4f}\n")
+                    f.write(f"  LLM Acc-Top3 [raw]:     {data['llm_acc_top3_raw']:.4f}\n")
             
             elif task == 'sentiment':
-                f.write(f"  EEG Accuracy:        {data.get('clip_acc', 0):.4f}\n")
-                f.write(f"  Text Acc (Raw):      {data.get('clip_acc_raw', 0):.4f}\n")
-                f.write(f"  Text Acc (Gen):      {data.get('clip_acc_gen', 0):.4f}\n")
-                if data.get('llm_acc_top1') is not None:
-                    f.write(f"  LLM-Pred Acc (Top1): {data['llm_acc_top1']:.4f}\n")
-                    f.write(f"  LLM-Pred Acc (Top3): {data['llm_acc_top3']:.4f}\n")
+                f.write(f"  EEG Accuracy:           {data.get('clip_acc', 0):.4f}\n")
+                f.write(f"  Text Acc (Raw):         {data.get('clip_acc_raw', 0):.4f}\n")
+                f.write(f"  Text Acc (Gen):         {data.get('clip_acc_gen', 0):.4f}\n")
+                if data.get('llm_acc_top1_gen') is not None:
+                    f.write(f"  LLM Acc [gen]:          {data['llm_acc_top1_gen']:.4f}\n")
+                if data.get('llm_acc_top1_raw') is not None:
+                    f.write(f"  LLM Acc [raw]:          {data['llm_acc_top1_raw']:.4f}\n")
             
             f.write(f"\n")
             
@@ -580,6 +790,19 @@ def save_results_to_txt(all_results, output_dir, checkpoint_path):
                         f.write(f"[{i+1:4d}] {correct}  Label: {str(label_name):<12s}  Pred: {pred_name:<12s}\n")
                         f.write(f"        Raw:  {r.get('raw_input_text', '')[:80]}\n")
                         f.write(f"        Gen:  {r.get('gen_text', '')[:80]}\n\n")
+
+                elif task in ('reading_paradigm_main', 'reading_paradigm_bench'):
+                    paradigm_names = ['NR', 'TSR']
+                    for i, r in enumerate(results):
+                        pred_idx  = r.get('pred', -1)
+                        label_idx = r.get('label', -1)
+                        pred_name  = paradigm_names[pred_idx]  if 0 <= pred_idx  < 2 else '?'
+                        label_name = paradigm_names[label_idx] if 0 <= label_idx < 2 else '?'
+                        correct = '✓' if pred_idx == label_idx else '✗'
+                        f.write(f"[{i+1:4d}] {correct}  Label: {label_name:<5s}  "
+                                f"Pred: {pred_name:<5s}  "
+                                f"P(NR)={r.get('prob_NR', 0):.3f}  P(TSR)={r.get('prob_TSR', 0):.3f}\n")
+                        f.write(f"        Raw:  {r.get('raw_input_text', '')[:80]}\n\n")
             
             f.write(f"\n{'='*80}\n")
         
@@ -590,22 +813,26 @@ def main():
     parser = argparse.ArgumentParser(description='Unified prediction script')
     parser.add_argument('--checkpoint', type=str, required=True, help='Path to checkpoint')
     parser.add_argument('--data_path', type=str, default='./data/tmp/zuco_eeg_label_8variants.df')
-    parser.add_argument('--task', type=str, default='all', 
-                        choices=['corpus', 'relation', 'sentiment', 'all'],
+    parser.add_argument('--task', type=str, default='all',
+                        choices=['corpus', 'relation', 'sentiment', 'reading_paradigm', 'all'],
                         help='Which prediction task to run')
     parser.add_argument('--batch_size', type=int, default=24)
     parser.add_argument('--device', type=str, default='cuda:0')
-    parser.add_argument('--use_llm', action='store_true', 
+    parser.add_argument('--use_llm', action='store_true',
                         help='Use LLM for classification (requires HF token for Llama)')
     parser.add_argument('--save_results', action='store_true', help='Save results to pickle files')
     parser.add_argument('--output_dir', type=str, default='./results')
+    # ── Benchmarking (cross-subject) ──────────────────────────────────────────
+    parser.add_argument('--bench_data_path', type=str, default=None,
+                        help='Path to benchmarking (held-out subjects) .df file.  '
+                             'If provided, reading_paradigm task also runs on this dataset.')
     args = parser.parse_args()
-    
-    # Load model and data
+
+    # Load model and main data
     model, dm, device = load_model_and_data(
         args.checkpoint, args.data_path, args.batch_size, args.device
     )
-    
+
     # Load LLM if requested
     llm_pipe = None
     if args.use_llm:
@@ -614,46 +841,78 @@ def main():
         except Exception as e:
             print(f"Warning: Could not load LLM: {e}")
             print("Continuing without LLM evaluation...")
-    
+
     all_results = {}
-    
-    # Run predictions
+
+    # ── Standard classification tasks ─────────────────────────────────────────
     if args.task in ['corpus', 'all']:
         all_results['corpus'] = predict_corpus(model, dm, device, args.use_llm, llm_pipe)
-    
+
     if args.task in ['relation', 'all']:
         all_results['relation'] = predict_relation(model, dm, device, args.use_llm, llm_pipe)
-    
+
     if args.task in ['sentiment', 'all']:
         all_results['sentiment'] = predict_sentiment(model, dm, device, args.use_llm, llm_pipe)
-    
-    # Summary table
+
+    # ── Reading Paradigm: NR vs TSR (zero-shot, task-blind) ───────────────────
+    if args.task in ['reading_paradigm', 'all']:
+        # Run on main test set (seen subjects)
+        all_results['reading_paradigm_main'] = predict_reading_paradigm(
+            model, dm.test_dataloader(), device, split_label='main_test'
+        )
+
+        # Run on benchmarking dataset (held-out / unseen subjects)
+        if args.bench_data_path:
+            bench_loader = make_benchmarking_loader(args.bench_data_path, args.batch_size)
+            all_results['reading_paradigm_bench'] = predict_reading_paradigm(
+                model, bench_loader, device, split_label='bench'
+            )
+        else:
+            console.print(
+                "[yellow]ℹ  --bench_data_path not provided — "
+                "skipping benchmarking (cross-subject) evaluation.[/yellow]"
+            )
+
+    # ── Summary table ─────────────────────────────────────────────────────────
     console.print("\n" + "="*80, style="bold green")
     console.print("SUMMARY", style="bold green")
     console.print("="*80, style="bold green")
-    
+
     summary_table = Table(title="All Results Summary")
     summary_table.add_column("Task", style="cyan")
-    summary_table.add_column("EEG Accuracy", style="green")
+    summary_table.add_column("ACC / EEG Acc", style="green")
     summary_table.add_column("Text Acc (Raw)", style="green")
     summary_table.add_column("Text Acc (Gen)", style="green")
-    summary_table.add_column("LLM Prediction", style="green")
-    
+    summary_table.add_column("LLM / Baseline", style="yellow")
+
     for task, data in all_results.items():
-        clip_acc = data.get('clip_acc', data.get('clip_acc1', 0))
-        summary_table.add_row(
-            task.capitalize(),
-            f"{clip_acc:.4f}",
-            f"{data.get('clip_acc_raw', 0):.4f}",
-            f"{data.get('clip_acc_gen', 0):.4f}",
-            f"{data.get('llm_acc', data.get('llm_acc_top1', 'N/A'))}" if data.get('llm_acc') or data.get('llm_acc_top1') else "N/A"
-        )
-    
+        if task in ('reading_paradigm_main', 'reading_paradigm_bench'):
+            nr  = data.get('nr_count', 0)
+            tsr = data.get('tsr_count', 0)
+            baseline = max(nr, tsr) / (nr + tsr) if (nr + tsr) > 0 else 0.0
+            summary_table.add_row(
+                f"Reading Paradigm [{data.get('split', task)}]",
+                f"{data.get('clip_acc', 0):.4f}",
+                "—",
+                "—",
+                f"baseline={baseline:.4f}",
+            )
+        else:
+            clip_acc = data.get('clip_acc', data.get('clip_acc1', 0))
+            summary_table.add_row(
+                task.capitalize(),
+                f"{clip_acc:.4f}",
+                f"{data.get('clip_acc_raw', 0):.4f}",
+                f"{data.get('clip_acc_gen', 0):.4f}",
+                f"{data.get('llm_acc', data.get('llm_acc_top1', 'N/A'))}" \
+                    if (data.get('llm_acc') or data.get('llm_acc_top1')) else "N/A"
+            )
+
     console.print(summary_table)
-    
+
     # Always save results to text files
     save_results_to_txt(all_results, args.output_dir, args.checkpoint)
-    
+
     # Optionally save to pickle
     if args.save_results:
         os.makedirs(args.output_dir, exist_ok=True)
@@ -661,7 +920,7 @@ def main():
             output_path = os.path.join(args.output_dir, f'{task}_predictions.pkl')
             pd.to_pickle(data['results'], output_path)
             print(f"Saved {task} pickle to {output_path}")
-    
+
     return all_results
 
 

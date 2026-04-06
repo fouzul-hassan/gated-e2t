@@ -57,8 +57,11 @@ class ZuCoMultiLabelDataset(Dataset):
         subject = str(row.get('subject', 'unknown'))
         sentiment = str(row.get('sentiment label', 'nan'))
         relation = str(row.get('relation label', 'nan'))
+        task = str(row.get('task', ''))
+        paradigm = 'NR' if ('task1' in task or 'task2' in task) else ('TSR' if 'task3' in task else 'nan')
+        is_sst = ('task1' in task)
 
-        return eeg_tensor, subject, sentiment, relation
+        return eeg_tensor, subject, sentiment, relation, paradigm, is_sst
 
 
 def load_data(data_path: str, seed: int = 42, val_ratio=0.1, test_ratio=0.1):
@@ -100,18 +103,22 @@ def extract_features(model, loader, device):
     all_subjects = []
     all_sentiments = []
     all_relations = []
+    all_paradigms = []
+    all_is_sst = []
 
     for batch in loader:
-        eeg, subjects, sentiments, relations = batch
+        eeg, subjects, sentiments, relations, paradigms, is_sst = batch
         eeg = eeg.to(device)
         features = model(eeg)  # (B, emb_size)
         all_features.append(features.cpu())
         all_subjects.extend(subjects)
         all_sentiments.extend(sentiments)
         all_relations.extend(relations)
+        all_paradigms.extend(paradigms)
+        all_is_sst.extend(is_sst.tolist())
 
     features = torch.cat(all_features, dim=0).numpy()
-    return features, all_subjects, all_sentiments, all_relations
+    return features, all_subjects, all_sentiments, all_relations, all_paradigms, all_is_sst
 
 
 # ── Linear Probe ─────────────────────────────────────────────────────────────
@@ -141,8 +148,7 @@ def run_linear_probe(train_features, train_labels, test_features, test_labels, t
     print(f"   Train distribution: {dict(train_dist)}")
     print(f"   Test distribution: {dict(test_dist)}")
 
-    # Fit classifier
-    clf = LogisticRegression(max_iter=2000, random_state=42, multi_class='multinomial', C=1.0)
+    clf = LogisticRegression(max_iter=2000, random_state=42, C=1.0)
     clf.fit(train_features, train_y)
 
     train_pred = clf.predict(train_features)
@@ -177,7 +183,7 @@ def run_linear_probe(train_features, train_labels, test_features, test_labels, t
 
 
 # ── Visualization ────────────────────────────────────────────────────────────
-def visualize_multitask_tsne(features, subjects, sentiments, relations, save_dir):
+def visualize_multitask_tsne(features, subjects, sentiments, relations, paradigms, is_sst_list, save_dir):
     """Create t-SNE plots colored by each label type."""
     print("\n🎨 Creating t-SNE visualizations...")
 
@@ -188,13 +194,17 @@ def visualize_multitask_tsne(features, subjects, sentiments, relations, save_dir
     tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
     feat_2d = tsne.fit_transform(feat_sample)
 
+    paradigms_no_sst = [p if not sst else 'nan' for p, sst in zip(paradigms, is_sst_list)]
+
     label_sets = {
         'Subject ID': [subjects[i] for i in indices],
+        'Paradigm (No SST)': [paradigms_no_sst[i] for i in indices],
+        'Paradigm (With SST)': [paradigms[i] for i in indices],
         'Sentiment': [sentiments[i] for i in indices],
         'Relation': [relations[i] for i in indices],
     }
 
-    fig, axes = plt.subplots(1, 3, figsize=(21, 6))
+    fig, axes = plt.subplots(1, 5, figsize=(35, 6))
     fig.suptitle('t-SNE of Pretrained EEG Features (colored by label type)', fontsize=14, fontweight='bold')
 
     for ax, (title, labels) in zip(axes, label_sets.items()):
@@ -343,8 +353,8 @@ def main():
 
     # ── Extract features ──
     print("\n🔍 Extracting features from frozen encoder...")
-    train_features, train_subj, train_sent, train_rel = extract_features(model, train_loader, device)
-    test_features, test_subj, test_sent, test_rel = extract_features(model, test_loader, device)
+    train_features, train_subj, train_sent, train_rel, train_para, train_sst = extract_features(model, train_loader, device)
+    test_features, test_subj, test_sent, test_rel, test_para, test_sst = extract_features(model, test_loader, device)
     print(f"   Feature shape: {train_features.shape}")
 
     # ── Feature statistics ──
@@ -402,8 +412,45 @@ def main():
     else:
         print("\n⚠️ Insufficient relation labels for probe")
 
+    # 4. Reading Paradigm (NR vs TSR) - Without SST
+    train_para_no_sst = [(f, l) for f, l, sst in zip(range(len(train_para)), train_para, train_sst)
+                       if l not in ('nan', 'None', '') and not sst]
+    test_para_no_sst = [(f, l, sst) for f, l, sst in zip(range(len(test_para)), test_para, test_sst)
+                      if l not in ('nan', 'None', '') and not sst]
+
+    if len(train_para_no_sst) > 10 and len(test_para_no_sst) > 5:
+        train_para_idx, train_para_labels = zip(*train_para_no_sst)
+        test_para_idx, test_para_labels, _ = zip(*test_para_no_sst)
+        result_para_no_sst = run_linear_probe(
+            train_features[list(train_para_idx)], list(train_para_labels),
+            test_features[list(test_para_idx)], list(test_para_labels),
+            "Paradigm (NR vs TSR) - No SST"
+        )
+        results.append(result_para_no_sst)
+    else:
+        print("\n⚠️ Insufficient paradigm labels for No-SST probe")
+
+    # 5. Reading Paradigm (NR vs TSR) - With SST
+    train_para_sst = [(f, l) for f, l in zip(range(len(train_para)), train_para)
+                       if l not in ('nan', 'None', '')]
+    test_para_sst = [(f, l) for f, l in zip(range(len(test_para)), test_para)
+                      if l not in ('nan', 'None', '')]
+
+    if len(train_para_sst) > 10 and len(test_para_sst) > 5:
+        train_para_idx, train_para_labels = zip(*train_para_sst)
+        test_para_idx, test_para_labels = zip(*test_para_sst)
+        result_para_sst = run_linear_probe(
+            train_features[list(train_para_idx)], list(train_para_labels),
+            test_features[list(test_para_idx)], list(test_para_labels),
+            "Paradigm (NR vs TSR) - WIth SST"
+        )
+        results.append(result_para_sst)
+    else:
+        print("\n⚠️ Insufficient paradigm labels for With-SST probe")
+
     # ── Visualizations ──
-    visualize_multitask_tsne(test_features, test_subj, test_sent, test_rel, save_dir)
+    visualize_multitask_tsne(test_features, test_subj, test_sent, test_rel, test_para, test_sst, save_dir)
+
     plot_probe_summary(results, save_dir)
 
     # ── Final Summary ──

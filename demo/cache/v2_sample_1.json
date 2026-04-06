@@ -1,0 +1,71 @@
+{
+  "gen_text": "The Emperor's Club is a film with good intentions, but it has some flaws.",
+  "text_metrics": {
+    "bleu1_mtv": 0.4285714328289032,
+    "bleu1_raw": 0.1610308438539505,
+    "bleu2_mtv": 0.18156826496124268,
+    "bleu2_raw": 0.0,
+    "bleu3_mtv": 0.0,
+    "bleu3_raw": 0.0,
+    "bleu4_mtv": 0.0,
+    "bleu4_raw": 0.0,
+    "rouge1_fmeasure_mtv": 0.375,
+    "rouge1_precision_mtv": 0.4000000059604645,
+    "rouge1_recall_mtv": 0.3529411852359772,
+    "rouge1_fmeasure_raw": 0.34285715222358704,
+    "rouge1_precision_raw": 0.4000000059604645,
+    "rouge1_recall_raw": 0.30000001192092896,
+    "wer": 0.9444444179534912
+  },
+  "sentiment_probs": [
+    0.306640625,
+    0.34765625,
+    0.345703125
+  ],
+  "sentiment_labels": [
+    "negative",
+    "neutral",
+    "positive"
+  ],
+  "relation_probs": [
+    0.1103515625,
+    0.10498046875,
+    0.123046875,
+    0.11328125,
+    0.1337890625,
+    0.09814453125,
+    0.10791015625,
+    0.09619140625,
+    0.1123046875
+  ],
+  "relation_labels": [
+    "awarding",
+    "education",
+    "employment",
+    "foundation",
+    "job title",
+    "nationality",
+    "political affiliation",
+    "visit",
+    "marriage"
+  ],
+  "corpus_probs": [
+    0.41015625,
+    0.58984375
+  ],
+  "corpus_labels": [
+    "movie review",
+    "biography"
+  ],
+  "paradigm_probs": [
+    0.44140625,
+    0.55859375
+  ],
+  "paradigm_labels": [
+    "NR",
+    "TSR"
+  ],
+  "_from_cache": false,
+  "_version": "v2",
+  "_ckpt": "E:\\MSc Files\\MSc Project\\gated-glim\\GLIM\\demo\\..\\runs\\v2\\epoch=199-step=397600.ckpt"
+}

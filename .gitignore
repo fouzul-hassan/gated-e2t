@@ -4,9 +4,23 @@ data/raw_data/ZuCo1/task_materials/*.csv
 data/raw_data/ZuCo1/revised_csv/*.csv
 data/raw_data/ZuCo2/task_materials/*.csv
 data/raw_data/ZuCo2/revised_csv/*.csv
+data/raw_data/ZuCo2_benchmarking/*.mat
+data/raw_data/ZuCo2_benchmarking/features/features/*.csv
+data/raw_data/ZuCo2_benchmarking/features/features/*.npy
 
 data/tmp/zuco_eeg_128ch_1280len.df
 data/tmp/zuco_eeg_label_8variants.df
+data/tmp/zuco_eeg_benchmarking.df
+data/tmp/zuco_eeg_label_benchmarking.df
+data/tmp/zuco_label_8variants.df
+
+evaluations/v1/*.pkl
+evaluations/v1/*.txt
+evaluations/v2/*.pkl
+evaluations/v2/*.txt
+
+pretraining/pretrain_plot_comparison/*.png
+pretraining/pretrain_plot_comparison/*.md
 
 *.zip
 
@@ -30,3 +44,7 @@ pretraining/pretrain_plots_pretrain5/*.md
 
 results/eeg-to-text/*.md
 results/eeg-to-text/*.json
+results/eeg-to-text/v1/*.json
+results/eeg-to-text/v1/*.md
+results/eeg-to-text/v2/*.json
+results/eeg-to-text/v2/*.md
