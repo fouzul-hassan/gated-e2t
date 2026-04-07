@@ -157,11 +157,13 @@ class GLIM(L.LightningModule):
             self.text_model = BartForConditionalGeneration.from_pretrained(
                 self.text_model_id, device_map=self.device,
                 torch_dtype=torch.bfloat16,
+                tie_word_embeddings=False,
             ).requires_grad_(False)
         else:  # T5 models (default)
             self.text_model = T5ForConditionalGeneration.from_pretrained(
                 self.text_model_id, device_map=self.device,
                 torch_dtype=torch.bfloat16,
+                tie_word_embeddings=False,
             ).requires_grad_(False)
         assert self.embed_dim == self.text_model.config.d_model
 
@@ -406,6 +408,18 @@ class GLIM(L.LightningModule):
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=False)  
         # NOTE: only for checkpointing here, allowing smaller batch size
         metrics.update(retrieval_metrics)
+        
+        # Gated attention metrics (if enabled)
+        if hasattr(self.eeg_encoder, 'get_gate_stats'):
+            gate_stats = self.eeg_encoder.get_gate_stats()
+            gated_metrics = {
+                'gate_mean': gate_stats.get('gate_mean', 0.0),
+                'gate_std': gate_stats.get('gate_std', 0.0),
+                'gate_sparsity': gate_stats.get('gate_sparsity', 0.0),
+                'gate_entropy': gate_stats.get('gate_entropy', 0.0),
+            }
+            metrics.update(gated_metrics)
+            
         metrics = ({f'val/{k}':v for k, v in metrics.items()})
         if self.current_epoch == 0 and batch_idx == 0:
             self.define_metrics(list(metrics.keys()))
@@ -849,6 +863,17 @@ class GLIM(L.LightningModule):
         
         retrieval_metrics = self.cal_retrieval_metrics(shared_outputs['logits_clip'], strict=True)  
         metrics.update(retrieval_metrics)
+        
+        # Gated attention metrics (if enabled)
+        if hasattr(self.eeg_encoder, 'get_gate_stats'):
+            gate_stats = self.eeg_encoder.get_gate_stats()
+            gated_metrics = {
+                'gate_mean': gate_stats.get('gate_mean', 0.0),
+                'gate_std': gate_stats.get('gate_std', 0.0),
+                'gate_sparsity': gate_stats.get('gate_sparsity', 0.0),
+                'gate_entropy': gate_stats.get('gate_entropy', 0.0),
+            }
+            metrics.update(gated_metrics)
         
         metrics = ({f'test/{k}-batch{batch_idx}':v for k, v in metrics.items()})
         self.log_dict(metrics, sync_dist=True, batch_size=self.bsz_retrieval)

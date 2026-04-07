@@ -9,45 +9,52 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from model.glim import GLIM
 from data.datamodule import GLIMDataModule
 
+import argparse
+
 warnings.filterwarnings("ignore", ".*when logging on epoch level in distributed.*")
-# set logger
-group_name = 'dev-dist-test'
-log_dir = './runs/' + group_name
-os.makedirs(log_dir, exist_ok=True)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--noise_input', action='store_true', help='Use noise input for sanity check')
+    args = parser.parse_args()
 
-devices = [0]
-L.seed_everything(42, workers=True)
-torch.set_float32_matmul_precision('medium')
+    # set logger
+    group_name = 'dev-dist-test'
+    log_dir = './runs/' + group_name
+    os.makedirs(log_dir, exist_ok=True)
 
-# logger = None
-logger = WandbLogger(project = 'glim',
-                     group = group_name,
-                     save_dir = log_dir,
-                    #  version = 'w25zyxe5',
-                    #  offline = True,
-                    )
+    devices = [0]
+    L.seed_everything(42, workers=True)
+    torch.set_float32_matmul_precision('medium')
 
-trainer = L.Trainer(accelerator = 'gpu',
-                    devices = devices,
-                    logger = logger,
-                    precision = 'bf16-mixed', 
-                    # limit_test_batches=2
-                    )
+    # logger = None
+    logger = WandbLogger(project = 'glim',
+                         group = group_name,
+                         save_dir = log_dir,
+                        #  version = 'w25zyxe5',
+                        #  offline = True,
+                        )
 
-dm = GLIMDataModule(data_path = './data/tmp/zuco_eeg_label_8variants.df',
-                    eval_noise_input = False,
-                    bsz_test = 24,
-                    num_workers = 2,
-                    )
+    trainer = L.Trainer(accelerator = 'gpu',
+                        devices = devices,
+                        logger = logger,
+                        precision = 'bf16-mixed', 
+                        # limit_test_batches=2
+                        )
 
-model = GLIM.load_from_checkpoint(
-    "./runs/v1/epoch=199-step=397600.ckpt",
-    map_location = f"cuda:{devices[0]}",
-    strict = False,
-    weights_only = False,
-    use_etes_eval = True,  # Enable ETES evaluation
-    log_xai = True,  # Enable XAI logging (gate stats, histograms)
-    # evaluate_prompt_embed = 'zero',
-    # prompt_dropout_probs = (0.0, 0.1, 0.1),
-    )
-trainer.test(model, datamodule=dm)
+    dm = GLIMDataModule(data_path = './data/tmp/zuco_eeg_label_8variants.df',
+                        eval_noise_input = args.noise_input,
+                        bsz_test = 24,
+                        num_workers = 2,
+                        )
+
+    model = GLIM.load_from_checkpoint(
+        "./runs/v2/epoch=199-step=397600.ckpt",
+        map_location = f"cuda:{devices[0]}",
+        strict = False,
+        weights_only = False,
+        use_etes_eval = True,  # Enable ETES evaluation
+        log_xai = True,  # Enable XAI logging (gate stats, histograms)
+        # evaluate_prompt_embed = 'zero',
+        # prompt_dropout_probs = (0.0, 0.1, 0.1),
+        )
+    trainer.test(model, datamodule=dm)

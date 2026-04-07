@@ -55,6 +55,7 @@ class GLIMDataModule(pl.LightningDataModule):
                                   batch_sampler=train_sampler,
                                   num_workers = self.num_workers,
                                   pin_memory=True,
+                                  persistent_workers=self.num_workers > 0,
                                   )
         return train_loader
 
@@ -65,6 +66,7 @@ class GLIMDataModule(pl.LightningDataModule):
                                 batch_sampler = val_sampler,
                                 num_workers = self.num_workers,
                                 pin_memory=True,
+                                persistent_workers=self.num_workers > 0,
                                 )
         return val_loader
     
@@ -75,6 +77,7 @@ class GLIMDataModule(pl.LightningDataModule):
                                  batch_sampler = test_sampler,
                                  num_workers = self.num_workers,
                                  pin_memory=True,
+                                 persistent_workers=self.num_workers > 0,
                                  )
         return test_loader
 

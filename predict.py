@@ -291,6 +291,7 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
     results = []
     all_labels = []
     all_probs = []
+    gate_means, gate_stds, gate_sparsities = [], [], []
     
     with torch.no_grad():
         for batch in track(dm.test_dataloader(), description="[EEG] Corpus prediction"):
@@ -307,6 +308,12 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
             
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 prob, gen_str = model.predict(eeg, eeg_mask, prompts, candidates, generate=True)
+            
+            if hasattr(model.eeg_encoder, 'get_gate_stats'):
+                gate_stats = model.eeg_encoder.get_gate_stats()
+                gate_means.append(gate_stats.get('gate_mean', 0.0))
+                gate_stds.append(gate_stats.get('gate_std', 0.0))
+                gate_sparsities.append(gate_stats.get('gate_sparsity', 0.0))
             
             all_labels.extend(labels)
             all_probs.append(prob)
@@ -339,6 +346,13 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item():.4f}")
     table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item():.4f}")
     
+    avg_gate_mean = sum(gate_means) / len(gate_means) if gate_means else 0.0
+    avg_gate_std = sum(gate_stds) / len(gate_stds) if gate_stds else 0.0
+    avg_gate_sparsity = sum(gate_sparsities) / len(gate_sparsities) if gate_sparsities else 0.0
+    if gate_means:
+        table.add_row("Gate Mean", f"{avg_gate_mean:.4f}")
+        table.add_row("Gate Sparsity", f"{avg_gate_sparsity*100:.2f}%")
+    
     # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe:
         llm_acc_gen, _ = compute_llm_accuracy(llm_pipe, results, 'corpus', all_labels, 2, input_type='gen')
@@ -359,6 +373,9 @@ def predict_corpus(model, dm, device, use_llm=False, llm_pipe=None):
         'llm_acc': llm_acc,
         'llm_acc_gen': llm_acc_gen,
         'llm_acc_raw': llm_acc_raw,
+        'gate_mean': avg_gate_mean,
+        'gate_std': avg_gate_std,
+        'gate_sparsity': avg_gate_sparsity,
     }
 
 
@@ -382,6 +399,7 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     all_labels = []
     all_probs = []
     seen_labels = set()  # Debug: collect unique labels
+    gate_means, gate_stds, gate_sparsities = [], [], []
     
     with torch.no_grad():
         for batch in track(dm.test_dataloader(), description="[EEG] Relation prediction"):
@@ -392,6 +410,12 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
             
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 prob, gen_str = model.predict(eeg, eeg_mask, prompts, candidates, generate=True)
+            
+            if hasattr(model.eeg_encoder, 'get_gate_stats'):
+                gate_stats = model.eeg_encoder.get_gate_stats()
+                gate_means.append(gate_stats.get('gate_mean', 0.0))
+                gate_stds.append(gate_stats.get('gate_std', 0.0))
+                gate_sparsities.append(gate_stats.get('gate_sparsity', 0.0))
             
             for i in range(len(eeg)):
                 rel_label = relation_labels[i] if i < len(relation_labels) else None
@@ -448,6 +472,13 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_row("Text Acc Gen (Top-1)", f"{clip_acc_gen1.item() if torch.is_tensor(clip_acc_gen1) else clip_acc_gen1:.4f}")
     table.add_row("Text Acc Gen (Top-3)", f"{clip_acc_gen3.item() if torch.is_tensor(clip_acc_gen3) else clip_acc_gen3:.4f}")
     
+    avg_gate_mean = sum(gate_means) / len(gate_means) if gate_means else 0.0
+    avg_gate_std = sum(gate_stds) / len(gate_stds) if gate_stds else 0.0
+    avg_gate_sparsity = sum(gate_sparsities) / len(gate_sparsities) if gate_sparsities else 0.0
+    if gate_means:
+        table.add_row("Gate Mean", f"{avg_gate_mean:.4f}")
+        table.add_row("Gate Sparsity", f"{avg_gate_sparsity*100:.2f}%")
+    
     # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe and all_labels:
         llm_acc1_gen, llm_acc3_gen = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='gen')
@@ -490,6 +521,9 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         'llm_acc_top3_gen': llm_acc3_gen,
         'llm_acc_top1_raw': llm_acc1_raw,
         'llm_acc_top3_raw': llm_acc3_raw,
+        'gate_mean': avg_gate_mean,
+        'gate_std': avg_gate_std,
+        'gate_sparsity': avg_gate_sparsity,
     }
 
 
@@ -510,6 +544,7 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     all_labels = []
     all_probs = []
     seen_labels = set()  # Debug
+    gate_means, gate_stds, gate_sparsities = [], [], []
     
     with torch.no_grad():
         for batch in track(dm.test_dataloader(), description="[EEG] Sentiment prediction"):
@@ -521,6 +556,12 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 prob, gen_str = model.predict(eeg, eeg_mask, prompts, candidates, generate=True)
             
+            if hasattr(model.eeg_encoder, 'get_gate_stats'):
+                gate_stats = model.eeg_encoder.get_gate_stats()
+                gate_means.append(gate_stats.get('gate_mean', 0.0))
+                gate_stds.append(gate_stats.get('gate_std', 0.0))
+                gate_sparsities.append(gate_stats.get('gate_sparsity', 0.0))
+                
             for i in range(len(eeg)):
                 sent_label = sentiment_labels[i] if i < len(sentiment_labels) else None
                 seen_labels.add(sent_label)  # Debug
@@ -565,6 +606,13 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
     table.add_row("Text Acc (Raw)", f"{clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw:.4f}")
     table.add_row("Text Acc (Gen)", f"{clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen:.4f}")
     
+    avg_gate_mean = sum(gate_means) / len(gate_means) if gate_means else 0.0
+    avg_gate_std = sum(gate_stds) / len(gate_stds) if gate_stds else 0.0
+    avg_gate_sparsity = sum(gate_sparsities) / len(gate_sparsities) if gate_sparsities else 0.0
+    if gate_means:
+        table.add_row("Gate Mean", f"{avg_gate_mean:.4f}")
+        table.add_row("Gate Sparsity", f"{avg_gate_sparsity*100:.2f}%")
+        
     # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe and all_labels:
         llm_acc1_gen, _ = compute_llm_accuracy(llm_pipe, valid_results, 'sentiment', all_labels, len(sentiment_types), input_type='gen')
@@ -587,6 +635,9 @@ def predict_sentiment(model, dm, device, use_llm=False, llm_pipe=None):
         'llm_acc_top1': llm_acc1,
         'llm_acc_top1_gen': llm_acc1_gen,
         'llm_acc_top1_raw': llm_acc1_raw,
+        'gate_mean': avg_gate_mean,
+        'gate_std': avg_gate_std,
+        'gate_sparsity': avg_gate_sparsity,
     }
 
 
@@ -616,6 +667,7 @@ def predict_reading_paradigm(model, loader, device, split_label: str = 'main_tes
     all_probs  = []
     nr_count   = 0
     tsr_count  = 0
+    gate_means, gate_stds, gate_sparsities = [], [], []
 
     with torch.no_grad():
         for batch in track(loader, description=f"[EEG] Reading-paradigm ({split_label})"):
@@ -640,6 +692,12 @@ def predict_reading_paradigm(model, loader, device, split_label: str = 'main_tes
 
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 prob, _ = model.predict(eeg, eeg_mask, neutral_prompts, candidates, generate=False)
+
+            if hasattr(model.eeg_encoder, 'get_gate_stats'):
+                gate_stats = model.eeg_encoder.get_gate_stats()
+                gate_means.append(gate_stats.get('gate_mean', 0.0))
+                gate_stds.append(gate_stats.get('gate_std', 0.0))
+                gate_sparsities.append(gate_stats.get('gate_sparsity', 0.0))
 
             all_labels.extend(labels)
             all_probs.append(prob)
@@ -672,6 +730,14 @@ def predict_reading_paradigm(model, loader, device, split_label: str = 'main_tes
     table.add_row("NR samples",  str(nr_count))
     table.add_row("TSR samples", str(tsr_count))
     table.add_row("Random baseline", f"{max(nr_count, tsr_count) / (nr_count + tsr_count):.4f}")
+    
+    avg_gate_mean = sum(gate_means) / len(gate_means) if gate_means else 0.0
+    avg_gate_std = sum(gate_stds) / len(gate_stds) if gate_stds else 0.0
+    avg_gate_sparsity = sum(gate_sparsities) / len(gate_sparsities) if gate_sparsities else 0.0
+    if gate_means:
+        table.add_row("Gate Mean", f"{avg_gate_mean:.4f}")
+        table.add_row("Gate Sparsity", f"{avg_gate_sparsity*100:.2f}%")
+        
     console.print(table)
 
     return {
@@ -680,6 +746,9 @@ def predict_reading_paradigm(model, loader, device, split_label: str = 'main_tes
         'nr_count':  nr_count,
         'tsr_count': tsr_count,
         'split':     split_label,
+        'gate_mean': avg_gate_mean,
+        'gate_std': avg_gate_std,
+        'gate_sparsity': avg_gate_sparsity,
     }
 
 
@@ -744,6 +813,13 @@ def save_results_to_txt(all_results, output_dir, checkpoint_path):
                     f.write(f"  LLM Acc [gen]:          {data['llm_acc_top1_gen']:.4f}\n")
                 if data.get('llm_acc_top1_raw') is not None:
                     f.write(f"  LLM Acc [raw]:          {data['llm_acc_top1_raw']:.4f}\n")
+            
+            if 'gate_mean' in data:
+                f.write(f"\n")
+                f.write(f"  --- Gated Attention Stats ---\n")
+                f.write(f"  Mean:                   {data['gate_mean']:.4f}\n")
+                f.write(f"  Std:                    {data['gate_std']:.4f}\n")
+                f.write(f"  Sparsity:               {data['gate_sparsity']*100:.2f}%\n")
             
             f.write(f"\n")
             

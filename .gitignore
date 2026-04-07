@@ -48,3 +48,21 @@ results/eeg-to-text/v1/*.json
 results/eeg-to-text/v1/*.md
 results/eeg-to-text/v2/*.json
 results/eeg-to-text/v2/*.md
+
+runs/dev-dist-test/
+runs/dev-dist-test/**/*.yaml
+runs/dev-dist-test/**/*.log
+runs/dev-dist-test/**/*.ckpt
+runs/dev-dist-test/**/*.txt
+runs/dev-dist-test/**/*.json
+runs/dev-dist-test/**/*.png
+runs/dev-dist-test/**/*.md
+runs/dev-dist-test/**/*.png
+runs/dev-dist-test/**/*.wandb
+
+thesis/
+
+#any pycache files
+data/__pycache__
+**/__pycache__
+
