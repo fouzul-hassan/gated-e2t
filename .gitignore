@@ -66,3 +66,5 @@ thesis/
 data/__pycache__
 **/__pycache__
 
+runs/v1/epoch=199-step=397600.ckpt
+runs/v2/epoch=199-step=397600.ckpt
