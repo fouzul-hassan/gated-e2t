@@ -432,21 +432,39 @@ class ETESEvaluator:
             self.fluency_model = None
     
     @torch.no_grad()
-    def encode_text(self, texts: List[str], device: torch.device) -> torch.Tensor:
-        """Encode texts to embeddings using the aligner."""
-        # Tokenize
-        inputs = self.tokenizer(texts, padding=True, truncation=True, 
-                                max_length=96, return_tensors='pt')
-        input_ids = inputs['input_ids'].to(device)
-        attention_mask = inputs['attention_mask'].to(device)
-        
-        # Encode through LM encoder
-        outputs = self.text_encoder(input_ids=input_ids, attention_mask=attention_mask)
-        hidden_states = outputs.last_hidden_state
-        
-        # Get embedding through aligner
-        text_emb = self.aligner.embed_text(hidden_states, attention_mask)
-        return text_emb
+    def encode_text(self, texts: List[str], device: torch.device,
+                    chunk_size: int = 8) -> torch.Tensor:
+        """Encode texts to embeddings using the aligner.
+
+        Processes texts in chunks of ``chunk_size`` to avoid CUDA OOM when
+        the full dataset is passed at once (e.g. during ETES evaluation after
+        testing).  Results are concatenated along dim-0 before returning.
+        """
+        aligner_dtype = next(self.aligner.parameters()).dtype
+        all_embs: List[torch.Tensor] = []
+
+        for start in range(0, len(texts), chunk_size):
+            chunk = texts[start: start + chunk_size]
+
+            # Tokenize this chunk only
+            inputs = self.tokenizer(chunk, padding=True, truncation=True,
+                                    max_length=96, return_tensors='pt')
+            input_ids = inputs['input_ids'].to(device)
+            attention_mask = inputs['attention_mask'].to(device)
+
+            # Encode through LM encoder
+            outputs = self.text_encoder(input_ids=input_ids,
+                                        attention_mask=attention_mask)
+            hidden_states = outputs.last_hidden_state
+
+            if hidden_states.dtype != aligner_dtype:
+                hidden_states = hidden_states.to(dtype=aligner_dtype)
+
+            # Get embedding through aligner
+            chunk_emb = self.aligner.embed_text(hidden_states, attention_mask)
+            all_embs.append(chunk_emb)
+
+        return torch.cat(all_embs, dim=0)
     
     @torch.no_grad()
     def compute_alignment_energy(self,

@@ -1,14 +1,23 @@
 {
+<<<<<<< HEAD
   "gen_text": "The movie is extremely bad from start to finish.",
   "text_metrics": {
     "bleu1_mtv": 0.3333333134651184,
     "bleu1_raw": 0.2222222089767456,
     "bleu2_mtv": 0.20412413775920868,
+=======
+  "gen_text": "... .........",
+  "text_metrics": {
+    "bleu1_mtv": 0.0,
+    "bleu1_raw": 0.0,
+    "bleu2_mtv": 0.0,
+>>>>>>> dcd307c (feat: folder strcture and demo)
     "bleu2_raw": 0.0,
     "bleu3_mtv": 0.0,
     "bleu3_raw": 0.0,
     "bleu4_mtv": 0.0,
     "bleu4_raw": 0.0,
+<<<<<<< HEAD
     "rouge1_fmeasure_mtv": 0.31578946113586426,
     "rouge1_precision_mtv": 0.3333333432674408,
     "rouge1_recall_mtv": 0.30000001192092896,
@@ -22,6 +31,21 @@
     "etes_total": -0.8145775198936462,
     "etes_reference": -0.6192368865013123,
     "etes_gap": -0.19534063339233398
+=======
+    "rouge1_fmeasure_mtv": 0.0,
+    "rouge1_precision_mtv": 0.0,
+    "rouge1_recall_mtv": 0.0,
+    "rouge1_fmeasure_raw": 0.0,
+    "rouge1_precision_raw": 0.0,
+    "rouge1_recall_raw": 0.0,
+    "wer": 1.0
+  },
+  "etes_metrics": {
+    "etes_alignment": 0.09200866520404816,
+    "etes_total": 0.09200866520404816,
+    "etes_reference": 0.09200865030288696,
+    "etes_gap": 1.4901161193847656e-08
+>>>>>>> dcd307c (feat: folder strcture and demo)
   },
   "eeg_emb_vector": [
     [
@@ -125409,9 +125433,15 @@
   ],
   "attention_layers": 6,
   "sentiment_probs": [
+<<<<<<< HEAD
     0.345703125,
     0.32421875,
     0.330078125
+=======
+    0.333984375,
+    0.333984375,
+    0.333984375
+>>>>>>> dcd307c (feat: folder strcture and demo)
   ],
   "sentiment_labels": [
     "negative",
@@ -125419,6 +125449,7 @@
     "positive"
   ],
   "relation_probs": [
+<<<<<<< HEAD
     0.11376953125,
     0.109375,
     0.10009765625,
@@ -125428,6 +125459,17 @@
     0.08544921875,
     0.126953125,
     0.10888671875
+=======
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125,
+    0.111328125
+>>>>>>> dcd307c (feat: folder strcture and demo)
   ],
   "relation_labels": [
     "awarding",
@@ -125441,16 +125483,26 @@
     "marriage"
   ],
   "corpus_probs": [
+<<<<<<< HEAD
     0.62109375,
     0.37890625
+=======
+    0.5,
+    0.5
+>>>>>>> dcd307c (feat: folder strcture and demo)
   ],
   "corpus_labels": [
     "movie review",
     "biography"
   ],
   "paradigm_probs": [
+<<<<<<< HEAD
     0.396484375,
     0.60546875
+=======
+    0.5,
+    0.5
+>>>>>>> dcd307c (feat: folder strcture and demo)
   ],
   "paradigm_labels": [
     "NR",
@@ -125458,5 +125510,9 @@
   ],
   "_from_cache": false,
   "_version": "v1",
+<<<<<<< HEAD
   "_ckpt": "E:\\MSc Files\\MSc Project\\gated-glim\\GLIM\\demo\\..\\runs\\v1\\epoch=199-step=397600.ckpt"
+=======
+  "_ckpt": "../runs/v1/epoch=199-step=397600.ckpt"
+>>>>>>> dcd307c (feat: folder strcture and demo)
 }

@@ -15,6 +15,8 @@ Usage:
     python predict.py --checkpoint <path> --task sentiment
     python predict.py --checkpoint <path> --task all
     python predict.py --checkpoint <path> --task all --use_llm  # Include LLM evaluation
+    python predict.py --checkpoint runs/v1/epoch=199-step=397600.ckpt --task all --use_llm  # Include LLM evaluation
+    python predict.py --checkpoint runs/v2/epoch=199-step=397600.ckpt --task all --use_llm  # Include LLM evaluation
 """
 
 import argparse
@@ -158,7 +160,7 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes, input_ty
     Compute LLM-based classification accuracy.
     Matches the notebook approaches exactly:
     - corpus: integer labels, max_new_tokens=4
-    - relation: top-3 text labels, max_new_tokens=16
+    - relation: top-5 text labels, max_new_tokens=24
     - sentiment: text labels, max_new_tokens=8
 
     Args:
@@ -184,14 +186,14 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes, input_ty
         instructions = {
             "role": "system", 
             "content": (
-                "You task is relation extraction. Please choose the top-3 from the below 9 possible labels:\n"
+                "You task is relation extraction. Please choose the top-5 from the below 9 possible labels:\n"
                 " awarding, education, employment, foundation, job title, nationality,"
                 " political affiliation, visit, and marriage.\n"
-                " Please just output the three most likely labels in descending order of probability,"
+                " Please just output the five most likely labels in descending order of probability,"
                 " and separate them by commas. Do not output any other words!"
             )
         }
-        max_new_tokens = 16
+        max_new_tokens = 24
     elif task_type == 'sentiment':
         instructions = {
             "role": "system", 
@@ -239,13 +241,14 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes, input_ty
         return llm_acc_top1, llm_acc_top1
     
     elif task_type == 'relation':
-        # Relation: top-3 text label matching (notebook approach)
+        # Relation: top-5 text label matching (notebook approach)
         all_relations = ['awarding', 'education', 'employment', 'foundation', 
                          'job title', 'nationality', 'political affiliation', 'visit', 'marriage']
         label_to_str = {i: r for i, r in enumerate(all_relations)}
         
         n_correct_top1 = 0
         n_correct_top3 = 0
+        n_correct_top5 = 0
         for i in range(len(outputs)):
             pred_text = outputs[i][0]['generated_text'][len(inputs[i]):].strip()
             pred_labels = [p.strip().lower() for p in pred_text.split(',')]
@@ -255,10 +258,13 @@ def compute_llm_accuracy(pipe, results, task_type, labels, num_classes, input_ty
                 n_correct_top1 += 1
             if true_label in pred_labels[:3]:
                 n_correct_top3 += 1
+            if true_label in pred_labels[:5]:
+                n_correct_top5 += 1
         
         llm_acc_top1 = n_correct_top1 / len(labels)
         llm_acc_top3 = n_correct_top3 / len(labels)
-        return llm_acc_top1, llm_acc_top3
+        llm_acc_top5 = n_correct_top5 / len(labels)
+        return llm_acc_top1, llm_acc_top3, llm_acc_top5
     
     elif task_type == 'sentiment':
         # Sentiment: text label matching (notebook approach)
@@ -444,20 +450,23 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         labels_tensor = torch.tensor(all_labels, device=probs.device)
         clip_acc1 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
         clip_acc3 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc5 = multiclass_accuracy(probs, labels_tensor, num_classes=len(relation_types), top_k=5, ignore_index=-1, average='micro')
         
         # Text embedding accuracy
         valid_results = [r for r in results if r['label_idx'] >= 0]
         probs_raw, probs_gen = compute_text_embedding_accuracy(model, valid_results, candidates, device, input_template="To English: <MASK>.")
         clip_acc_raw1 = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
         clip_acc_raw3 = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc_raw5 = multiclass_accuracy(probs_raw, labels_tensor, num_classes=len(relation_types), top_k=5, ignore_index=-1, average='micro')
         clip_acc_gen1 = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=1, ignore_index=-1, average='micro')
         clip_acc_gen3 = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=3, ignore_index=-1, average='micro')
+        clip_acc_gen5 = multiclass_accuracy(probs_gen, labels_tensor, num_classes=len(relation_types), top_k=5, ignore_index=-1, average='micro')
         # Keep backward-compatible aliases (top-3 as primary, matching notebook)
         clip_acc_raw = clip_acc_raw3
         clip_acc_gen = clip_acc_gen3
     else:
-        clip_acc1, clip_acc3 = 0, 0
-        clip_acc_raw1, clip_acc_raw3, clip_acc_gen1, clip_acc_gen3 = 0, 0, 0, 0
+        clip_acc1, clip_acc3, clip_acc5 = 0, 0, 0
+        clip_acc_raw1, clip_acc_raw3, clip_acc_raw5, clip_acc_gen1, clip_acc_gen3, clip_acc_gen5 = 0, 0, 0, 0, 0, 0
         clip_acc_raw, clip_acc_gen = 0, 0
     
     # Results table
@@ -467,10 +476,13 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
     
     table.add_row("EEG Acc (Top-1)", f"{clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1:.4f}")
     table.add_row("EEG Acc (Top-3)", f"{clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3:.4f}")
+    table.add_row("EEG Acc (Top-5)", f"{clip_acc5.item() if torch.is_tensor(clip_acc5) else clip_acc5:.4f}")
     table.add_row("Text Acc Raw (Top-1)", f"{clip_acc_raw1.item() if torch.is_tensor(clip_acc_raw1) else clip_acc_raw1:.4f}")
     table.add_row("Text Acc Raw (Top-3)", f"{clip_acc_raw3.item() if torch.is_tensor(clip_acc_raw3) else clip_acc_raw3:.4f}")
+    table.add_row("Text Acc Raw (Top-5)", f"{clip_acc_raw5.item() if torch.is_tensor(clip_acc_raw5) else clip_acc_raw5:.4f}")
     table.add_row("Text Acc Gen (Top-1)", f"{clip_acc_gen1.item() if torch.is_tensor(clip_acc_gen1) else clip_acc_gen1:.4f}")
     table.add_row("Text Acc Gen (Top-3)", f"{clip_acc_gen3.item() if torch.is_tensor(clip_acc_gen3) else clip_acc_gen3:.4f}")
+    table.add_row("Text Acc Gen (Top-5)", f"{clip_acc_gen5.item() if torch.is_tensor(clip_acc_gen5) else clip_acc_gen5:.4f}")
     
     avg_gate_mean = sum(gate_means) / len(gate_means) if gate_means else 0.0
     avg_gate_std = sum(gate_stds) / len(gate_stds) if gate_stds else 0.0
@@ -479,19 +491,20 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         table.add_row("Gate Mean", f"{avg_gate_mean:.4f}")
         table.add_row("Gate Sparsity", f"{avg_gate_sparsity*100:.2f}%")
     
-    # LLM accuracy — run on both generated and raw text
     if use_llm and llm_pipe and all_labels:
-        llm_acc1_gen, llm_acc3_gen = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='gen')
-        llm_acc1_raw, llm_acc3_raw = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='raw')
+        llm_acc1_gen, llm_acc3_gen, llm_acc5_gen = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='gen')
+        llm_acc1_raw, llm_acc3_raw, llm_acc5_raw = compute_llm_accuracy(llm_pipe, valid_results, 'relation', all_labels, len(relation_types), input_type='raw')
         table.add_row("LLM acc-top1 [gen]", f"{llm_acc1_gen:.4f}")
         table.add_row("LLM acc-top3 [gen]", f"{llm_acc3_gen:.4f}")
+        table.add_row("LLM acc-top5 [gen]", f"{llm_acc5_gen:.4f}")
         table.add_row("LLM acc-top1 [raw]", f"{llm_acc1_raw:.4f}")
         table.add_row("LLM acc-top3 [raw]", f"{llm_acc3_raw:.4f}")
+        table.add_row("LLM acc-top5 [raw]", f"{llm_acc5_raw:.4f}")
         # Keep legacy keys for summary table backward-compat
-        llm_acc1, llm_acc3 = llm_acc1_gen, llm_acc3_gen
+        llm_acc1, llm_acc3, llm_acc5 = llm_acc1_gen, llm_acc3_gen, llm_acc5_gen
     else:
-        llm_acc1_gen, llm_acc3_gen, llm_acc1_raw, llm_acc3_raw = None, None, None, None
-        llm_acc1, llm_acc3 = None, None
+        llm_acc1_gen, llm_acc3_gen, llm_acc5_gen, llm_acc1_raw, llm_acc3_raw, llm_acc5_raw = None, None, None, None, None, None
+        llm_acc1, llm_acc3, llm_acc5 = None, None, None
     
     console.print(table)
     console.print(f"Valid samples: {len(all_labels)}")
@@ -508,19 +521,25 @@ def predict_relation(model, dm, device, use_llm=False, llm_pipe=None):
         'results': results,
         'clip_acc1': clip_acc1.item() if torch.is_tensor(clip_acc1) else clip_acc1,
         'clip_acc3': clip_acc3.item() if torch.is_tensor(clip_acc3) else clip_acc3,
+        'clip_acc5': clip_acc5.item() if torch.is_tensor(clip_acc5) else clip_acc5,
         'clip_acc_raw1': clip_acc_raw1.item() if torch.is_tensor(clip_acc_raw1) else clip_acc_raw1,
         'clip_acc_raw3': clip_acc_raw3.item() if torch.is_tensor(clip_acc_raw3) else clip_acc_raw3,
+        'clip_acc_raw5': clip_acc_raw5.item() if torch.is_tensor(clip_acc_raw5) else clip_acc_raw5,
         'clip_acc_gen1': clip_acc_gen1.item() if torch.is_tensor(clip_acc_gen1) else clip_acc_gen1,
         'clip_acc_gen3': clip_acc_gen3.item() if torch.is_tensor(clip_acc_gen3) else clip_acc_gen3,
+        'clip_acc_gen5': clip_acc_gen5.item() if torch.is_tensor(clip_acc_gen5) else clip_acc_gen5,
         # Keep old keys pointing to top-3 for backward-compat
         'clip_acc_raw': clip_acc_raw.item() if torch.is_tensor(clip_acc_raw) else clip_acc_raw,
         'clip_acc_gen': clip_acc_gen.item() if torch.is_tensor(clip_acc_gen) else clip_acc_gen,
         'llm_acc_top1': llm_acc1,
         'llm_acc_top3': llm_acc3,
+        'llm_acc_top5': llm_acc5,
         'llm_acc_top1_gen': llm_acc1_gen,
         'llm_acc_top3_gen': llm_acc3_gen,
+        'llm_acc_top5_gen': llm_acc5_gen,
         'llm_acc_top1_raw': llm_acc1_raw,
         'llm_acc_top3_raw': llm_acc3_raw,
+        'llm_acc_top5_raw': llm_acc5_raw,
         'gate_mean': avg_gate_mean,
         'gate_std': avg_gate_std,
         'gate_sparsity': avg_gate_sparsity,
@@ -794,16 +813,21 @@ def save_results_to_txt(all_results, output_dir, checkpoint_path):
             elif task == 'relation':
                 f.write(f"  EEG Acc (Top-1):        {data.get('clip_acc1', 0):.4f}\n")
                 f.write(f"  EEG Acc (Top-3):        {data.get('clip_acc3', 0):.4f}\n")
+                f.write(f"  EEG Acc (Top-5):        {data.get('clip_acc5', 0):.4f}\n")
                 f.write(f"  Text Acc Raw (Top-1):   {data.get('clip_acc_raw1', 0):.4f}\n")
                 f.write(f"  Text Acc Raw (Top-3):   {data.get('clip_acc_raw3', 0):.4f}\n")
+                f.write(f"  Text Acc Raw (Top-5):   {data.get('clip_acc_raw5', 0):.4f}\n")
                 f.write(f"  Text Acc Gen (Top-1):   {data.get('clip_acc_gen1', 0):.4f}\n")
                 f.write(f"  Text Acc Gen (Top-3):   {data.get('clip_acc_gen3', 0):.4f}\n")
+                f.write(f"  Text Acc Gen (Top-5):   {data.get('clip_acc_gen5', 0):.4f}\n")
                 if data.get('llm_acc_top1_gen') is not None:
                     f.write(f"  LLM Acc-Top1 [gen]:     {data['llm_acc_top1_gen']:.4f}\n")
                     f.write(f"  LLM Acc-Top3 [gen]:     {data['llm_acc_top3_gen']:.4f}\n")
+                    f.write(f"  LLM Acc-Top5 [gen]:     {data['llm_acc_top5_gen']:.4f}\n")
                 if data.get('llm_acc_top1_raw') is not None:
                     f.write(f"  LLM Acc-Top1 [raw]:     {data['llm_acc_top1_raw']:.4f}\n")
                     f.write(f"  LLM Acc-Top3 [raw]:     {data['llm_acc_top3_raw']:.4f}\n")
+                    f.write(f"  LLM Acc-Top5 [raw]:     {data['llm_acc_top5_raw']:.4f}\n")
             
             elif task == 'sentiment':
                 f.write(f"  EEG Accuracy:           {data.get('clip_acc', 0):.4f}\n")

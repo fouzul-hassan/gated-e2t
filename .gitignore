@@ -69,6 +69,7 @@ data/__pycache__
 runs/v1/epoch=199-step=397600.ckpt
 runs/v2/epoch=199-step=397600.ckpt
 
+<<<<<<< HEAD
 
 *.ckpt
 
@@ -76,3 +77,8 @@ demo/test/*
 
 results/wandb-direct-evaluation/*
 results/predictions/*
+=======
+glim-trained-checkpoint/
+
+demo/test/
+>>>>>>> dcd307c (feat: folder strcture and demo)

@@ -5,8 +5,8 @@ echo "🔹 Updating pip"
 python3 -m pip install --upgrade pip
 
 # echo "🔹 Cloning GLIM repo"
-# git clone https://github.com/fouzul-hassan/latent-based-eeg-to-text
-# cd latent-based-eeg-to-text
+git clone https://github.com/fouzul-hassan/latent-based-eeg-to-text
+cd latent-based-eeg-to-text
 
 echo "🔹 Installing requirements"
 pip install -r requirements.txt

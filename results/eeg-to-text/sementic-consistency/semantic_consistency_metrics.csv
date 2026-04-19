@@ -1,0 +1,16 @@
+Output,Method,Model,ACC-1 Sentiment,ACC-1 Relation,ACC-3 Relation,ACC Corpus,Output-Method
+EEG embed,CLIP-like,"GLIM [Liu et al, 2025]",0.4269,0.3245,0.5714,0.9348,EEG embed | CLIP-like
+EEG embed,CLIP-like,GRAPE-GLIM v1 (ours),0.2854,0.1367,0.3653,0.4121,EEG embed | CLIP-like
+EEG embed,CLIP-like,GRAPE-GLIM v2 (ours),0.3237,0.1531,0.348,0.5711,EEG embed | CLIP-like
+Gen text,LLM-assist,"GLIM [Liu et al, 2025]",0.3957,0.0724,0.5633,0.9216,Gen text | LLM-assist
+Gen text,LLM-assist,GRAPE-GLIM v1 (ours),0.3094,0.0776,0.7286,0.9121,Gen text | LLM-assist
+Gen text,LLM-assist,GRAPE-GLIM v2 (ours),0.3165,0.0796,0.6459,0.9189,Gen text | LLM-assist
+Gen text embed,CLIP-like,"GLIM [Liu et al, 2025]",0.3957,0.2071,0.4326,0.8736,Gen text embed | CLIP-like
+Gen text embed,CLIP-like,GRAPE-GLIM v1 (ours),0.2878,0.302,0.4827,0.3909,Gen text embed | CLIP-like
+Gen text embed,CLIP-like,GRAPE-GLIM v2 (ours),0.3909,0.3643,0.4827,0.615,Gen text embed | CLIP-like
+Raw text,LLM-assist,"GLIM [Liu et al, 2025]",0.7338,0.0969,0.7551,0.8614,Raw text | LLM-assist
+Raw text,LLM-assist,GRAPE-GLIM v1 (ours),0.7337,0.0745,0.7551,0.8641,Raw text | LLM-assist
+Raw text,LLM-assist,GRAPE-GLIM v2 (ours),0.7337,0.0765,0.7704,0.8641,Raw text | LLM-assist
+Raw text embed,CLIP-like,"GLIM [Liu et al, 2025]",0.4556,0.253,0.4969,0.9185,Raw text embed | CLIP-like
+Raw text embed,CLIP-like,GRAPE-GLIM v1 (ours),0.4197,0.3786,0.3786,0.5072,Raw text embed | CLIP-like
+Raw text embed,CLIP-like,GRAPE-GLIM v2 (ours),0.4101,0.2959,0.4827,0.5408,Raw text embed | CLIP-like

@@ -23,16 +23,151 @@ import numpy as np
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
+import h5py
+from glob import glob
+from scipy import signal
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Dataset, DataLoader
 from collections import Counter
 
 sys.path.insert(0, '..')
 sys.path.insert(0, '.')
 from pretraining.pretrain_glim_encoder import GLIMEncoderPretrainer
+
+SCRIPT_DIR = os.path.dirname(__file__)
+RAW_BENCH_DIR = os.path.join(SCRIPT_DIR, '..', 'data', 'raw_data', 'ZuCo2_benchmarking')
+RAW_TASK_DIR = os.path.join(SCRIPT_DIR, '..', 'data', 'raw_data', 'ZuCo2', 'task_materials')
+LABEL_TABLE_PATH = os.path.join(SCRIPT_DIR, '..', 'data', 'tmp', 'zuco_label_8variants.df')
+BENCH_CACHE_PATH = os.path.join(SCRIPT_DIR, '..', 'data', 'tmp', 'zuco_eeg_label_benchmarking_compat.df')
+
+SUBJECT_KEYS = ['XAH', 'XBB', 'XBD', 'XDT', 'XLS', 'XPB', 'XSE', 'XSS', 'XTR', 'XWS']
+SRC_SAMPLE_RATE = 500
+TGT_SAMPLE_RATE = 128
+TGT_MAX_LEN = 1280
+TGT_WIDTH = 128
+SRC_CHANNELS = 105
+MIN_LEN = int(0.5 * SRC_SAMPLE_RATE)
+MAX_LEN = int(10 * SRC_SAMPLE_RATE)
+
+TYPOS = {
+    "emp11111ty": "empty", "film.1": "film.", "–": "-", "\u2018s": "'s",
+    "\ufffd s": "'s", "`s": "'s", "Maria": "Mari\u0107",
+    "1Universidad": "Universidad", "1902\u201419": "1902 - 19",
+    "Wuerttemberg": "W\u00fcrttemberg", "long -time": "long-time",
+    "Jose": "Jos\u00e9", "Bucher": "B\u00f4cher", "1839 ? May": "1839 - May",
+    "G\ufffd n\ufffd ration": "Generation", "Bragan\u00e7a": "Bragana",
+    "1837?October": "1837 - October", "nVera-Ellen": "Vera-Ellen",
+    "write Ethics": "wrote Ethics", "Adams-Onis": "Adams-On\u00eds",
+    "(40 km?)": "(40 km\u00b2)", "(40 km\u02dd)": "(40 km\u00b2)",
+    " (IPA: /?g?nz?b?/ ) ": " ", '""Canes""': '"Canes"',
+    "111Senator": "Senator", "Creteil": "Cr\u00e9teil",
+    "Zoonomia": "Zo\u00f6nomia", "nee Darwin": "n\u00e9e Darwin",
+    "Ruthy": "R\u00e9thy", "Eidgenoessische": "Eidgen\u00f6ssische",
+    "40 km\ufffd": "40 km\u00b2", "King Leopold": "King L\u00e9opold",
+}
+
+
+def revise_typo(text: str):
+    if not isinstance(text, str):
+        return text
+    for src, tgt in TYPOS.items():
+        if src in text:
+            text = text.replace(src, tgt)
+    return text
+
+
+def load_zuco2_ordered_sentences(task_dir: str) -> list[str]:
+    def load_sentences_from_csvs(prefix, n_files=7):
+        sentences = []
+        for i in range(1, n_files + 1):
+            fpath = os.path.join(task_dir, f'{prefix}_{i}.csv')
+            df = pd.read_csv(fpath, sep=';', encoding='utf-8', header=None,
+                             names=['paragraph_id', 'sentence_id', 'sentence', 'control'],
+                             dtype=str)
+            sentences.extend(df['sentence'].tolist())
+        return sentences
+
+    nr_sentences = load_sentences_from_csvs('nr')
+    tsr_sentences = load_sentences_from_csvs('tsr')
+    return [None] + nr_sentences + tsr_sentences
+
+
+def build_benchmark_dataframe() -> pd.DataFrame:
+    print("   [fallback] Rebuilding benchmarking dataframe from raw .mat files...")
+    ordered_sentences = load_zuco2_ordered_sentences(RAW_TASK_DIR)
+    mat_paths = sorted(glob(os.path.join(RAW_BENCH_DIR, 'results*.mat')))
+
+    records = []
+    for mat_path in mat_paths:
+        subject_key = os.path.basename(mat_path).replace('results', '').replace('.mat', '')
+        if subject_key not in SUBJECT_KEYS:
+            continue
+
+        with h5py.File(mat_path, 'r') as mat:
+            s = mat['sentenceData']
+            n = s['rawData'].shape[0]
+            for j in range(n):
+                raw_ref = s['rawData'][j][0]
+                eeg_raw = mat[raw_ref][:].astype(np.float32)
+                if not np.all(np.isfinite(eeg_raw)):
+                    continue
+
+                T, ch = eeg_raw.shape
+                if ch != SRC_CHANNELS or not (MIN_LEN < T <= MAX_LEN):
+                    continue
+
+                sid_ref = s['sentID'][j][0]
+                sid_data = mat[sid_ref][()]
+                sent_id = int(sid_data.flat[0])
+                if sent_id < 1 or sent_id >= len(ordered_sentences):
+                    continue
+
+                text = revise_typo(ordered_sentences[sent_id])
+
+                T_new = int(T * TGT_SAMPLE_RATE / SRC_SAMPLE_RATE)
+                eeg_ds = signal.resample(eeg_raw, T_new, axis=0)
+                eeg_padded = np.pad(eeg_ds, ((0, 0), (0, TGT_WIDTH - SRC_CHANNELS)), 'constant', constant_values=0)
+                eeg_final = np.pad(eeg_padded, ((0, TGT_MAX_LEN - T_new), (0, 0)), 'constant', constant_values=0)
+                mask = np.zeros(TGT_MAX_LEN, dtype=np.int8)
+                mask[:T_new] = 1
+
+                records.append({
+                    'eeg': eeg_final,
+                    'mask': mask,
+                    'text': text,
+                    'dataset': 'ZuCo2_benchmarking',
+                    'task': 'unknown',
+                    'subject': subject_key,
+                })
+
+    df = pd.DataFrame(records)
+    print(f"   [fallback] Rebuilt benchmarking rows: {len(df)}")
+
+    label_table = pd.read_pickle(LABEL_TABLE_PATH)
+    label_deduped = (label_table
+                     .sort_values('dataset', ascending=False)
+                     .drop_duplicates('input text', keep='first')
+                     .reset_index(drop=True))
+    text_to_label_id = label_deduped.set_index('input text')['text uid'].to_dict()
+    df['label id'] = df['text'].map(text_to_label_id)
+    df = df.dropna(subset=['label id']).copy()
+    df['label id'] = df['label id'].astype(int)
+
+    df_eeg = df.reindex(columns=['eeg', 'mask', 'subject', 'label id'])
+    df_final = df_eeg.merge(label_deduped, left_on='label id', right_on='text uid', how='left')
+    df_final['phase'] = 'benchmarking'
+
+    try:
+        pd.to_pickle(df_final, BENCH_CACHE_PATH)
+        print(f"   [fallback] Cached compatible benchmark dataframe -> {BENCH_CACHE_PATH}")
+    except Exception as cache_exc:
+        print(f"   [fallback] Cache save skipped: {cache_exc}")
+
+    return df_final
 
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
@@ -63,7 +198,21 @@ class ZuCoMultiLabelDataset(Dataset):
 def load_dataset(data_path: str, is_main: bool = True):
     """Load dataset. If main, returns train/test splits. If benchmarking, returns all data."""
     print(f"📂 Loading data from {data_path}")
-    df = pd.read_pickle(data_path)
+    if is_main:
+        df = pd.read_pickle(data_path)
+    else:
+        if os.path.exists(BENCH_CACHE_PATH):
+            try:
+                print(f"   Using compatible cache: {BENCH_CACHE_PATH}")
+                df = pd.read_pickle(BENCH_CACHE_PATH)
+            except Exception:
+                df = build_benchmark_dataframe()
+        else:
+            try:
+                df = pd.read_pickle(data_path)
+            except Exception as exc:
+                print(f"   [WARN] Could not read benchmark pickle ({type(exc).__name__}: {exc})")
+                df = build_benchmark_dataframe()
     
     if is_main:
         train_df = df[df['phase'] == 'train']
@@ -146,7 +295,16 @@ def train_and_eval_probe(train_feat, train_labels,
     # class_weight='balanced' perfectly handles the class imbalance!
     base_clf = SVC(kernel='linear', class_weight='balanced', random_state=42)
     
-    clf = GridSearchCV(base_clf, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+    clf = GridSearchCV(
+        base_clf,
+        param_grid,
+        cv=cv,
+        scoring='accuracy',
+        n_jobs=1,
+        pre_dispatch=1,
+        error_score='raise',
+    )
     clf.fit(train_X, train_y)
 
     print(f"   ⭐ Best parameters: {clf.best_params_}")
