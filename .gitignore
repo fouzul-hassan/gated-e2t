@@ -69,16 +69,20 @@ data/__pycache__
 runs/v1/epoch=199-step=397600.ckpt
 runs/v2/epoch=199-step=397600.ckpt
 
-<<<<<<< HEAD
 
 *.ckpt
 
-demo/test/*
+# all checkpoint files under runs/ (large, not needed in repo)
+runs/**/*.ckpt
 
-results/wandb-direct-evaluation/*
-results/predictions/*
-=======
+# pretrained model weights (large binary files)
+pretraining/Results/**/*.pth
+pretraining/Results/**/*.pt
+
 glim-trained-checkpoint/
 
 demo/test/
->>>>>>> dcd307c (feat: folder strcture and demo)
+
+results/wandb-direct-evaluation/*
+results/predictions/*
+
