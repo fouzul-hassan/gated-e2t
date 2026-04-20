@@ -1,10 +1,10 @@
 # GRAPE-GLIM: Gated Representation EEG-to-Language Interface Model
 
-This repository implements **GRAPE-GLIM**, an MSc research pipeline for decoding natural language from raw EEG signals recorded during natural reading. The system extends the original GLIM (Grounded Language-Image Model) baseline with two primary contributions: a **Signal-JEPA self-supervised pretraining stage** for the EEG encoder, and **gated cross-attention** within the transformer backbone.
+This repository implements **GRAPE-GLIM**, an MSc research pipeline for decoding natural language from raw EEG signals recorded during natural reading. The system extends the original GLIM (Grounded Language-Image Model) baseline with two primary contributions: a **JEPA self-supervised pretraining stage** for the EEG encoder, and **gated cross-attention** within the transformer backbone.
 
 The pipeline consists of three sequential stages:
 
-1. Self-supervised pretraining of the EEG encoder using a JEPA-style masked prediction objective (Signal-JEPA)
+1. Self-supervised pretraining of the EEG encoder using a JEPA-style masked prediction objective (JEPA)
 2. Linear probing of the frozen pretrained encoder to verify representation quality
 3. End-to-end fine-tuning of the full GLIM model on the EEG-to-text task, optionally initialised from the pretrained encoder
 
@@ -16,7 +16,7 @@ The pipeline consists of three sequential stages:
 - [Repository Layout](#repository-layout)
 - [Environment Setup](#environment-setup)
 - [Data Preparation](#data-preparation)
-- [Stage 1: Signal-JEPA Pretraining](#stage-1-signal-jepa-pretraining)
+- [Stage 1: JEPA Pretraining](#stage-1-JEPA-pretraining)
   - [Architecture](#pretraining-architecture)
   - [Running the Pretrainer](#running-the-pretrainer)
   - [Pretraining Configuration Reference](#pretraining-configuration-reference)
@@ -47,6 +47,17 @@ The pipeline consists of three sequential stages:
 
 ---
 
+> [!IMPORTANT]
+> **Data & Model Weights Access**
+> 
+> The raw datasets, preprocessed features, and checkpoint files are extremely large and are hosted externally on Google Drive. Please download them before attempting to run the code:
+> - **[RAW Data Folder (~150 GB)](https://drive.google.com/drive/u/1/folders/1r2kyU89MugmcYgcH5YnXdGeiNQLdblMo)**: Extract and place contents in `data/raw_data/`
+> - **[TMP Preprocessed Features (~40.5 GB)](https://drive.google.com/drive/folders/1RBBxx8eIIPQ5kISLg2A517CJwoPAGTwZ?usp=sharing)**: Extract and place contents in `data/tmp/`
+> - **[Pretraining Weights (191 MB)](https://drive.google.com/drive/folders/1F4Mpofw9GJkt_p8LEMUURacmkJmwbbcc?usp=drive_link)**: Place the `.pth` files in `pretraining/Results/`
+> - **[Fine-Tuning Checkpoints (595 GB)](https://drive.google.com/drive/folders/18cZyG-F3ktpZPUmlara2SWMvm_79IrRv?usp=drive_link)**: Place the `.ckpt` files in `runs/v1/` and `runs/v2/`
+>
+> *(See down below for instructions on how to use them)*
+
 ## Project Overview
 
 **Task.** Given a segment of 128-channel EEG recorded while a participant silently reads a sentence, decode the semantic content of that sentence as natural language text.
@@ -57,10 +68,10 @@ The pipeline consists of three sequential stages:
 
 | Design choice | This work | Original GLIM |
 |---|---|---|
-| EEG encoder initialisation | Signal-JEPA pretrained weights | Random initialisation |
+| EEG encoder initialisation | JEPA pretrained weights | Random initialisation |
 | Attention mechanism | Optional gated attention (elementwise or headwise sigmoid gate) | Standard scaled dot-product attention |
 | Text decoding | Beam search, nucleus sampling, or greedy | Beam search only |
-| Language model | Frozen Flan-T5-Large (or Flan-T5-Small / BART-Large-CNN) | Frozen Flan-T5-Large |
+| Language model | Frozen Flan-T5-Large | Frozen Flan-T5-Large |
 | Alignment loss | Symmetric CLIP + optional commitment loss | Symmetric CLIP |
 
 ---
@@ -77,7 +88,7 @@ GLIM/
 |
 |-- pretraining/
 |   |-- pretrain_glim_encoder.py    # GLIMEncoderPretrainer model definition
-|   |-- run_pretrain.py             # Training script for Signal-JEPA pretraining
+|   |-- run_pretrain.py             # Training script for JEPA pretraining
 |   |-- main.py                     # EEG2Rep-style CLI pretraining (alternative)
 |   |-- load_pretrained.py          # Weight transfer: pretrained encoder -> GLIM
 |   |-- evaluate_pretrained.py      # Single-task linear probe + t-SNE visualisation
@@ -179,9 +190,31 @@ pip install -r pretraining/requirements.txt
 
 ---
 
+## Datasets and References
+
+The pipeline is built around the ZuCo datasets (Zurich Cognitive Language Processing Corpus).
+
+**[ZuCo 1.0](https://osf.io/q3zws/)**
+- HOLLENSTEIN, N. et al., 2018. ZuCo, a simultaneous EEG and eye-tracking resource for natural sentence reading. Scientific Data, 5(1), p. 180291.
+- HOLLENSTEIN, N. et al., 2022. Zurich Cognitive Language Processing Corpus: A simultaneous EEG and eye-tracking resource for analyzing the human reading process. [online]. OSF. Available from: osf.io/q3zws.
+
+**[ZuCo 2.0](https://osf.io/2urht/)**
+- HOLLENSTEIN, N. et al., 2019. ZuCo 2.0: A Dataset of Physiological Recordings During Natural Reading and Annotation. Available from: https://arxiv.org/abs/1912.00903 [Accessed 15 Apr 2026].
+- HOLLENSTEIN, N. et al., 2025. ZuCo 2.0: A Dataset of Physiological Recordings During Natural Reading and Annotation. [online]. OSF. Available from: osf.io/2urht.
+
+**[ZuCo 2.0 Benchmarking (Heldout Testset)](https://osf.io/d7frw/)**
+- HOLLENSTEIN, N. et al., 2023. The ZuCo benchmark on cross-subject reading task classification with EEG and eye-tracking data. Frontiers in Psychology, 13, p. 1028824.
+- HOLLENSTEIN, N. et al., 2022. ZuCo Reading Task Classification Benchmark using EEG and Eye-Tracking Data. [online]. OSF. Available from: osf.io/d7frw.
+
+---
+
 ## Data Preparation
 
-The processed dataset is stored as pandas pickle files under `data/tmp/`. These files are not tracked by git due to their size. Run the four numbered notebooks in order if starting from raw ZuCo `.mat` files:
+Raw is based .mat files and some features extracted as .csv file. Such as the ground truth. [RAW Data Folder (Google Drive) ~150 GB](https://drive.google.com/drive/u/1/folders/1r2kyU89MugmcYgcH5YnXdGeiNQLdblMo). Extract the contents and place them inside the `data/raw_data/` directory before running the pipeline.
+
+The processed dataset is stored as pandas pickle files under `data/tmp/`. These files are not tracked by git due to their size. Download the pre-processed folder directly from Google Drive: [TMP Folder (Google Drive) ~40.5 GB](https://drive.google.com/drive/folders/1RBBxx8eIIPQ5kISLg2A517CJwoPAGTwZ?usp=sharing). Extract the contents and place them inside the `data/tmp/` directory before running the pipeline.
+
+Run the four numbered notebooks in order if starting from raw ZuCo `.mat` files:
 
 ```
 data/__STEP1_text_extract_revise.ipynb        # Extract and clean raw sentences from ZuCo XML/mat
@@ -224,8 +257,7 @@ GLIMSampler ensures every batch contains samples from distinct text UIDs, which 
 
 ---
 
-## Stage 1: Signal-JEPA Pretraining
-
+## Stage 1: Pretraining - GRAPE
 ### Pretraining Architecture
 
 The pretrainer (`pretraining/pretrain_glim_encoder.py`) wraps GLIM's `EncoderBlock` modules in a JEPA-style masked prediction framework borrowed from EEG2Rep.
@@ -286,26 +318,6 @@ python run_pretrain.py \
     --gpu 0
 ```
 
-**Using the EEG2Rep-style CLI runner** (operates on separate benchmark datasets such as Crowdsource or DREAMER):
-
-```bash
-cd pretraining
-python main.py \
-    --data_dir Dataset/Crowdsource \
-    --Training_mode Rep-Learning \
-    --epochs 200 \
-    --batch_size 128 \
-    --lr 1e-3 \
-    --emb_size 16 \
-    --layers 4 \
-    --num_heads 8 \
-    --patch_size 8 \
-    --mask_ratio 0.5 \
-    --momentum 0.99 \
-    --gpu 0
-```
-
-This runner uses `running.py` which calls either `Rep_Learning` or `Supervised` training modes. It is suitable for in-domain or cross-domain pretraining on third-party EEG datasets.
 
 ### Pretraining Configuration Reference
 
@@ -436,14 +448,14 @@ Edit the path inside `inspect_checkpoint.py` to point to your checkpoint.
 
 ---
 
-## Stage 3: Fine-Tuning GLIM
+## Stage 3: Fine-Tuning /GRAPE-GLIM
 
 Fine-tuning trains the complete GRAPE-GLIM pipeline end-to-end. The language model (Flan-T5-Large by default) is kept frozen throughout. Only the EEG encoder, prompt embedder, and cross-modal aligner are trained.
 
 **All fine-tuning commands are run from the project root:**
 
 ```bash
-cd e:\MSc Files\MSc Project\gated-glim\GLIM   # or equivalent on your system
+cd e:\MSc Files\MSc Project\gated-glim\latent-based-eeg-to-text   # or equivalent on your system
 ```
 
 ### Option A: Training from Scratch (Baseline)
@@ -527,29 +539,6 @@ temperature = 0.7                # lower = less random; 1.0 = unscaled logits
 - `nucleus`: Samples from the smallest probability-mass-sufficient vocabulary subset at each step. Produces more diverse outputs.
 - `greedy`: Deterministic single-best-token selection at each step. Fastest inference.
 
-### Option D: BART Language Model Backbone
-
-Uses `facebook/bart-large-cnn` as the frozen decoder instead of Flan-T5-Large. Requires `embed_dim = 1024` (BART's d_model).
-
-```bash
-python experiments/train_with_jepa_encoder_bart.py
-```
-
-Or the standalone BART script without JEPA:
-
-```bash
-python experiments/train_bart.py
-```
-
-### Option E: Small Flan-T5 Variant
-
-Uses `google/flan-t5-small` (embed_dim = 512). Suitable for development on machines with limited GPU memory.
-
-```bash
-python experiments/train_with_jepa_encoder-small.py
-```
-
-Note: `embed_dim` must be set to 512 (matching `flan-t5-small`'s d_model). The aligner's output projection changes accordingly.
 
 ### Fine-Tuning Configuration Reference
 
@@ -801,7 +790,7 @@ This runs inference for all 10 demo samples and saves results as JSON files unde
 | `experiments/sweep_train.py` | experiments/ | WandB hyperparameter sweep launcher |
 | `experiments/sweep_eval.py` | experiments/ | WandB sweep evaluation runner |
 | `experiments/run_eval.py` | experiments/ | Evaluate a saved checkpoint |
-| `pretraining/run_pretrain.py` | pretraining/ | Signal-JEPA pretraining |
+| `pretraining/run_pretrain.py` | pretraining/ | JEPA pretraining |
 | `pretraining/main.py` | pretraining/ | EEG2Rep-style pretraining (benchmark datasets) |
 | `pretraining/evaluate_pretrained.py` | pretraining/ | Single-task probe + t-SNE |
 | `pretraining/evaluate_multitask_probe.py` | pretraining/ | Multi-task probe (5 tasks) |
@@ -811,6 +800,11 @@ This runs inference for all 10 demo samples and saves results as JSON files unde
 ---
 
 ## Runs and Checkpoint Layout
+
+You can download the pre-trained and fine-tuned weights directly from Google Drive to bypass Stage 1 and quickly evaluate the model:
+
+- **Pretraining Weights (JEPA):** [Download Here (Google Drive) 191 MB](https://drive.google.com/drive/folders/1F4Mpofw9GJkt_p8LEMUURacmkJmwbbcc?usp=drive_link). Place the `.pth` files inside `pretraining/Results/`.
+- **Fine-Tuning Checkpoints:** [Download Here (Google Drive) 595 GB](https://drive.google.com/drive/folders/18cZyG-F3ktpZPUmlara2SWMvm_79IrRv?usp=drive_link). This contains the GRAPE-GLIM v1 and v2 `.ckpt` files. Place them inside `runs/v1/` and `runs/v2/`.
 
 ```
 runs/
@@ -880,3 +874,24 @@ python demo/app.py --port 7861
 ```bash
 python demo/app.py --share
 ```
+
+---
+
+## References & Code Acknowledgements
+
+This repository and pipeline were heavily inspired by and build upon the following open-source frameworks and associated research:
+
+- **[GLIM Base Architecture](https://github.com/justin-xzliu/GLIM)**  
+  LIU, X., SHEN, D. and LIU, X., 2025. Learning Interpretable Representations Leads to Semantically Faithful EEG-to-Text Generation. Available from: http://arxiv.org/abs/2505.17099
+
+- **[EEG-To-Text](https://github.com/NeuSpeech/EEG-To-Text)**  
+  O, H. et al., 2024. Are EEG-to-Text Models Working? Available from: http://arxiv.org/abs/2405.06459 
+
+- **[VICReg](https://github.com/facebookresearch/vicreg)**  
+  BARDES, A., PONCE, J. and LECUN, Y., 2021. VICReg: Variance-Invariance-Covariance Regularization for Self-Supervised Learning. Available from: https://arxiv.org/abs/2105.04906
+
+- **[EEG2Rep](https://github.com/Navidfoumani/EEG2Rep)**  
+  FOUMANI, N.M. et al., 2024. EEG2Rep: Enhancing Self-supervised EEG Representation Through Informative Masked Inputs. Available from: https://arxiv.org/abs/2402.17772
+
+- **[I-JEPA](https://github.com/facebookresearch/ijepa)**  
+  ASSRAN, M. et al., 2023. Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture. Available from: http://arxiv.org/abs/2301.08243
