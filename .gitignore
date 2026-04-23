@@ -13,6 +13,10 @@ data/tmp/zuco_eeg_label_8variants.df
 data/tmp/zuco_eeg_benchmarking.df
 data/tmp/zuco_eeg_label_benchmarking.df
 data/tmp/zuco_label_8variants.df
+data/tmp/zuco_eeg_label_benchmarking_compat.df
+# all large processed dataframes
+data/tmp/*.df
+
 
 evaluations/v1/*.pkl
 evaluations/v1/*.txt
