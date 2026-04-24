@@ -191,7 +191,7 @@ def visualize_multitask_tsne(features, subjects, sentiments, relations, paradigm
     indices = np.random.choice(len(features), n_samples, replace=False)
     feat_sample = features[indices]
 
-    tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, max_iter=1000)
     feat_2d = tsne.fit_transform(feat_sample)
 
     paradigms_no_sst = [p if not sst else 'nan' for p, sst in zip(paradigms, is_sst_list)]

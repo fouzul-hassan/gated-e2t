@@ -325,6 +325,9 @@ class GLIM(L.LightningModule):
 
     def define_metrics(self, metric_keys: list=None) -> None:
         run = self.logger.experiment
+        # define_metric is WandB-only; skip for CSV / other loggers
+        if not hasattr(run, 'define_metric'):
+            return
         for key in metric_keys:
             if 'loss' in key:
                 run.define_metric(key, summary='min')
@@ -845,7 +848,17 @@ class GLIM(L.LightningModule):
                 print(f"[XAI] Traceback: {traceback.format_exc()}")
         
         sample_metrics = pd.DataFrame(all_rows)
-        self.logger.log_table(key=f'{prefix}/Samples', dataframe=sample_metrics)
+        # log_table is WandB-only; fall back to CSV for other loggers
+        if hasattr(self.logger, 'log_table'):
+            self.logger.log_table(key=f'{prefix}/Samples', dataframe=sample_metrics)
+        else:
+            try:
+                import os
+                csv_dir = self.logger.log_dir if hasattr(self.logger, 'log_dir') else '.'
+                csv_path = os.path.join(csv_dir, f'{prefix}_samples.csv')
+                sample_metrics.to_csv(csv_path, index=False)
+            except Exception:
+                pass
 
     def on_test_epoch_start(self):
         assert not dist.is_initialized()  # NOTE: use single GPU to ensure the reproducibility

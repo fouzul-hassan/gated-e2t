@@ -90,3 +90,7 @@ demo/test/
 results/wandb-direct-evaluation/*
 results/predictions/*
 
+ablations/STATUS.md
+ablations/logs/*
+
+
