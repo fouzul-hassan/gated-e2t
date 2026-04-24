@@ -152,19 +152,24 @@ class GLIM(L.LightningModule):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.tokenizer = AutoTokenizer.from_pretrained(self.text_model_id)
         
-        # Load appropriate model based on text_model_id
+        # Load appropriate model based on text_model_id.
+        # NOTE: We intentionally avoid device_map=self.device here.
+        # Newer transformers versions run caching_allocator_warmup() when
+        # device_map is set, issuing cudaMemGetInfo before CUDA is fully
+        # initialised — causing "CUDA error: unknown error" in inference
+        # scripts. Load on CPU first, then move to the target device.
         if 'bart' in self.text_model_id.lower():
             self.text_model = BartForConditionalGeneration.from_pretrained(
-                self.text_model_id, device_map=self.device,
+                self.text_model_id,
                 torch_dtype=torch.bfloat16,
                 tie_word_embeddings=False,
-            ).requires_grad_(False)
+            ).requires_grad_(False).to(self.device)
         else:  # T5 models (default)
             self.text_model = T5ForConditionalGeneration.from_pretrained(
-                self.text_model_id, device_map=self.device,
+                self.text_model_id,
                 torch_dtype=torch.bfloat16,
                 tie_word_embeddings=False,
-            ).requires_grad_(False)
+            ).requires_grad_(False).to(self.device)
         assert self.embed_dim == self.text_model.config.d_model
 
         # Energy loss removed - using default CLS loss only
