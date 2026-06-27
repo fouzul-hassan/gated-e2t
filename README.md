@@ -1,6 +1,6 @@
-# GRAPE-GLIM: Gated Representation EEG-to-Language Interface Model
+# GRAPE-E2T: Gated Representation EEG-to-Language Interface Model
 
-This repository implements **GRAPE-GLIM**, an MSc research pipeline for decoding natural language from raw EEG signals recorded during natural reading. The system extends the original GLIM (Grounded Language-Image Model) baseline with two primary contributions: a **JEPA self-supervised pretraining stage** for the EEG encoder, and **gated cross-attention** within the transformer backbone.
+This repository implements **GRAPE-E2T**, an MSc research pipeline for decoding natural language from raw EEG signals recorded during natural reading. The system extends the original GLIM (Grounded Language-Image Model) baseline with two primary contributions: a **JEPA self-supervised pretraining stage** for the EEG encoder, and **gated cross-attention** within the transformer backbone.
 
 The pipeline consists of three sequential stages:
 
@@ -27,7 +27,7 @@ The pipeline consists of three sequential stages:
   - [Inspecting the Pretrained Checkpoint](#inspecting-the-pretrained-checkpoint)
 - [Stage 3: Fine-Tuning GLIM](#stage-3-fine-tuning-glim)
   - [Option A: Training from Scratch (Baseline)](#option-a-training-from-scratch-baseline)
-  - [Option B: Fine-Tuning with JEPA Encoder (GRAPE-GLIM)](#option-b-fine-tuning-with-jepa-encoder-grape-glim)
+  - [Option B: Fine-Tuning with JEPA Encoder (GRAPE-E2T)](#option-b-fine-tuning-with-jepa-encoder-GRAPE-E2T)
   - [Option C: Gated Attention with Nucleus Sampling](#option-c-gated-attention-with-nucleus-sampling)
   - [Option D: BART Language Model Backbone](#option-d-bart-language-model-backbone)
   - [Option E: Small Flan-T5 Variant](#option-e-small-flan-t5-variant)
@@ -81,7 +81,7 @@ The pipeline consists of three sequential stages:
 ```
 GLIM/
 |-- model/
-|   |-- glim.py                     # Full GRAPE-GLIM LightningModule
+|   |-- glim.py                     # Full GRAPE-E2T LightningModule
 |   |-- modules.py                  # EEGEncoder, Aligner, PromptEmbedder, EncoderBlock
 |   |-- energy.py                   # ETESEvaluator, EnergyContrastiveLoss, EnergyGuidedGenerator
 |   `-- xai_logging.py              # WandB XAI attention logging helpers
@@ -131,8 +131,8 @@ GLIM/
 |   `-- cache/                      # Per-sample JSON inference cache
 |
 |-- runs/
-|   |-- v1/                         # GRAPE-GLIM v1 checkpoint (epoch=199)
-|   `-- v2/                         # GRAPE-GLIM v2 checkpoint (epoch=199, noise-augmented)
+|   |-- v1/                         # GRAPE-E2T v1 checkpoint (epoch=199)
+|   `-- v2/                         # GRAPE-E2T v2 checkpoint (epoch=199, noise-augmented)
 |
 |-- evaluations/                    # Saved per-run evaluation outputs
 |-- results/                        # Final aggregated result dataframes
@@ -150,8 +150,8 @@ GLIM/
 **Recommended:** Create a dedicated conda environment.
 
 ```bash
-conda create -n grape-glim python=3.10 -y
-conda activate grape-glim
+conda create -n GRAPE-E2T python=3.10 -y
+conda activate GRAPE-E2T
 ```
 
 **Install PyTorch with CUDA.** Check https://pytorch.org for the correct command for your CUDA version. Example for CUDA 12.1:
@@ -448,9 +448,9 @@ Edit the path inside `inspect_checkpoint.py` to point to your checkpoint.
 
 ---
 
-## Stage 3: Fine-Tuning /GRAPE-GLIM
+## Stage 3: Fine-Tuning /GRAPE-E2T
 
-Fine-tuning trains the complete GRAPE-GLIM pipeline end-to-end. The language model (Flan-T5-Large by default) is kept frozen throughout. Only the EEG encoder, prompt embedder, and cross-modal aligner are trained.
+Fine-tuning trains the complete GRAPE-E2T pipeline end-to-end. The language model (Flan-T5-Large by default) is kept frozen throughout. Only the EEG encoder, prompt embedder, and cross-modal aligner are trained.
 
 **All fine-tuning commands are run from the project root:**
 
@@ -481,9 +481,9 @@ To run on a single GPU:
 devices = [0]
 ```
 
-### Option B: Fine-Tuning with JEPA Encoder (GRAPE-GLIM)
+### Option B: Fine-Tuning with JEPA Encoder (GRAPE-E2T)
 
-Loads pretrained weights into `model.eeg_encoder.in_blocks` before fine-tuning. This is the primary GRAPE-GLIM training pathway.
+Loads pretrained weights into `model.eeg_encoder.in_blocks` before fine-tuning. This is the primary GRAPE-E2T training pathway.
 
 ```bash
 python train_with_jepa_encoder.py
@@ -804,14 +804,14 @@ This runs inference for all 10 demo samples and saves results as JSON files unde
 You can download the pre-trained and fine-tuned weights directly from Google Drive to bypass Stage 1 and quickly evaluate the model:
 
 - **Pretraining Weights (JEPA):** [Download Here (Google Drive) 191 MB](https://drive.google.com/drive/folders/1F4Mpofw9GJkt_p8LEMUURacmkJmwbbcc?usp=drive_link). Place the `.pth` files inside `pretraining/Results/`.
-- **Fine-Tuning Checkpoints:** [Download Here (Google Drive) 595 GB](https://drive.google.com/drive/folders/18cZyG-F3ktpZPUmlara2SWMvm_79IrRv?usp=drive_link). This contains the GRAPE-GLIM v1 and v2 `.ckpt` files. Place them inside `runs/v1/` and `runs/v2/`.
+- **Fine-Tuning Checkpoints:** [Download Here (Google Drive) 595 GB](https://drive.google.com/drive/folders/18cZyG-F3ktpZPUmlara2SWMvm_79IrRv?usp=drive_link). This contains the GRAPE-E2T v1 and v2 `.ckpt` files. Place them inside `runs/v1/` and `runs/v2/`.
 
 ```
 runs/
 |-- v1/
-|   `-- epoch=199-step=397600.ckpt    # GRAPE-GLIM v1: gated attention, beam search
+|   `-- epoch=199-step=397600.ckpt    # GRAPE-E2T v1: gated attention, beam search
 |-- v2/
-|   `-- epoch=199-step=397600.ckpt    # GRAPE-GLIM v2: gated attention, noise-augmented dataset
+|   `-- epoch=199-step=397600.ckpt    # GRAPE-E2T v2: gated attention, noise-augmented dataset
 |-- dev-dist-test/                    # Earlier test run with WandB artifacts
 `-- latest-run/                       # Symlink or copy of the most recent run
 ```
